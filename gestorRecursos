@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📅 Gestor de Reservas - Recursos del Liceo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4CAF50 0%, #2196F3 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2196F3, #4CAF50);
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .left-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            height: fit-content;
+        }
+
+        .right-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #2196F3, #4CAF50);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #495057);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+        }
+
+        .recursos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .recurso-card {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .recurso-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .recurso-card.disponible {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .recurso-card.ocupado {
+            border-color: #dc3545;
+            background: #f8d7da;
+            cursor: not-allowed;
+        }
+
+        .recurso-card.disponible:hover {
+            background: #c3e6cb;
+        }
+
+        .recurso-nombre {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .recurso-estado {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .estado-disponible {
+            background: #28a745;
+            color: white;
+        }
+
+        .estado-ocupado {
+            background: #dc3545;
+            color: white;
+        }
+
+        .info-seleccion {
+            background: #e3f2fd;
+            border: 2px solid #2196F3;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-seleccion h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .reservas-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .reserva-item {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reserva-info {
+            flex: 1;
+        }
+
+        .reserva-recurso {
+            font-weight: 600;
+            color: #2196F3;
+        }
+
+        .reserva-detalles {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 3px;
+        }
+
+        .btn-cancelar {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+            color: #6c757d;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #2196F3;
+            border-bottom-color: #2196F3;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border: 2px solid #dee2e6;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2196F3;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 Gestor de Reservas</h1>
+            <p>Sistema de Reserva de Recursos del Liceo</p>
+        </div>
+
+        <div class="main-content">
+            <div class="left-panel">
+                <h3>🔍 Consultar Disponibilidad</h3>
+                
+                <div class="form-group">
+                    <label for="fecha">📅 Fecha:</label>
+                    <input type="date" id="fecha" onchange="actualizarDisponibilidad()">
+                </div>
+
+                <div class="form-group">
+                    <label for="turno">🕒 Turno:</label>
+                    <select id="turno" onchange="actualizarHoras()">
+                        <option value="">Seleccionar turno</option>
+                        <option value="matutino">Matutino (1era a 8va)</option>
+                        <option value="vespertino">Vespertino (0 a 7ma)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="hora">⏰ Hora:</label>
+                    <select id="hora" onchange="actualizarDisponibilidad()">
+                        <option value="">Seleccionar hora</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="consultarDisponibilidad()">
+                    🔍 Consultar Disponibilidad
+                </button>
+
+                <button class="btn btn-secondary" onclick="limpiarSeleccion()">
+                    🗑️ Limpiar
+                </button>
+            </div>
+
+            <div class="right-panel">
+                <div class="tabs">
+                    <div class="tab active" onclick="cambiarTab('disponibilidad')">
+                        📋 Disponibilidad
+                    </div>
+                    <div class="tab" onclick="cambiarTab('reservas')">
+                        📝 Mis Reservas
+                    </div>
+                    <div class="tab" onclick="cambiarTab('reportes')">
+                        📊 Reportes
+                    </div>
+                </div>
+
+                <div id="tab-disponibilidad" class="tab-content active">
+                    <div id="info-consulta" style="display: none;">
+                        <div class="info-seleccion">
+                            <h3>📍 Consulta Actual</h3>
+                            <div id="detalles-consulta"></div>
+                        </div>
+                    </div>
+
+                    <div id="mensaje-inicial" class="alert alert-warning">
+                        👆 Selecciona fecha, turno y hora para ver los recursos disponibles
+                    </div>
+
+                    <div id="recursos-container" style="display: none;">
+                        <h3>🎯 Recursos Disponibles</h3>
+                        <div id="recursos-grid" class="recursos-grid"></div>
+                    </div>
+                </div>
+
+                <div id="tab-reservas" class="tab-content">
+                    <h3>📝 Mis Reservas Activas</h3>
+                    <div id="reservas-container" class="reservas-list"></div>
+                </div>
+
+                <div id="tab-reportes" class="tab-content">
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-reservas">0</div>
+                            <div class="stat-label">Total Reservas</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="reservas-hoy">0</div>
+                            <div class="stat-label">Reservas Hoy</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="recursos-disponibles">0</div>
+                            <div class="stat-label">Recursos Disponibles</div>
+                        </div>
+                    </div>
+
+                    <h3>📊 Reservas por Recurso</h3>
+                    <div id="reporte-recursos"></div>
+
+                    <h3>📅 Reservas por Turno</h3>
+                    <div id="reporte-turnos"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de recursos por turno
+        const recursosMatutino = [
+            'Cañón',
+            'TV Planta Baja',
+            'TV Planta Alta',
+            'TV 43"',
+            'TV 50"',
+            'Caja'
+        ];
+
+        const recursosVespertino = [
+            ...recursosMatutino,
+            'Sala de Informática',
+            'Salón 10'
+        ];
+
+        const horasMatutino = ['1era', '2da', '3era', '4ta', '5ta', '6ta', '7ma', '8va'];
+        const horasVespertino = ['0', '1era', '2da', '3era', '4ta', '5ta', '6ta', '7ma'];
+
+        // Almacenamiento de reservas (en producción usarías una base de datos)
+        let reservas = JSON.parse(localStorage.getItem('reservasLiceo')) || [];
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            // Establecer fecha actual
+            const hoy = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha').value = hoy;
+            
+            // Actualizar visualización
+            actualizarReservas();
+            actualizarReportes();
+        });
+
+        function actualizarHoras() {
+            const turno = document.getElementById('turno').value;
+            const horaSelect = document.getElementById('hora');
+            
+            horaSelect.innerHTML = '<option value="">Seleccionar hora</option>';
+            
+            let horas = [];
+            if (turno === 'matutino') {
+                horas = horasMatutino;
+            } else if (turno === 'vespertino') {
+                horas = horasVespertino;
+            }
+            
+            horas.forEach(hora => {
+                const option = document.createElement('option');
+                option.value = hora;
+                option.textContent = hora;
+                horaSelect.appendChild(option);
+            });
+
+            actualizarDisponibilidad();
+        }
+
+        function actualizarDisponibilidad() {
+            const fecha = document.getElementById('fecha').value;
+            const turno = document.getElementById('turno').value;
+            const hora = document.getElementById('hora').value;
+
+            if (fecha && turno && hora) {
+                consultarDisponibilidad();
+            }
+        }
+
+        function consultarDisponibilidad() {
+            const fecha = document.getElementById('fecha').value;
+            const turno = document.getElementById('turno').value;
+            const hora = document.getElementById('hora').value;
+
+            if (!fecha || !turno || !hora) {
+                alert('⚠️ Por favor selecciona fecha, turno y hora');
+                return;
+            }
+
+            // Mostrar información de la consulta
+            document.getElementById('mensaje-inicial').style.display = 'none';
+            document.getElementById('info-consulta').style.display = 'block';
+            document.getElementById('recursos-container').style.display = 'block';
+
+            const fechaFormatted = new Date(fecha + 'T00:00:00').toLocaleDateString('es-ES', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            document.getElementById('detalles-consulta').innerHTML = `
+                <strong>📅 Fecha:</strong> ${fechaFormatted}<br>
+                <strong>🕒 Turno:</strong> ${turno.charAt(0).toUpperCase() + turno.slice(1)}<br>
+                <strong>⏰ Hora:</strong> ${hora}
+            `;
+
+            // Obtener recursos según el turno
+            const recursos = turno === 'matutino' ? recursosMatutino : recursosVespertino;
+            
+            // Verificar disponibilidad
+            const recursosGrid = document.getElementById('recursos-grid');
+            recursosGrid.innerHTML = '';
+
+            recursos.forEach(recurso => {
+                const estaReservado = reservas.some(reserva => 
+                    reserva.fecha === fecha && 
+                    reserva.turno === turno && 
+                    reserva.hora === hora && 
+                    reserva.recurso === recurso &&
+                    !esPasado(reserva.fecha, reserva.hora, reserva.turno)
+                );
+
+                const card = document.createElement('div');
+                card.className = `recurso-card ${estaReservado ? 'ocupado' : 'disponible'}`;
+                card.innerHTML = `
+                    <div class="recurso-nombre">${recurso}</div>
+                    <div class="recurso-estado ${estaReservado ? 'estado-ocupado' : 'estado-disponible'}">
+                        ${estaReservado ? '❌ Ocupado' : '✅ Disponible'}
+                    </div>
+                `;
+
+                if (!estaReservado) {
+                    card.onclick = () => realizarReserva(fecha, turno, hora, recurso);
+                }
+
+                recursosGrid.appendChild(card);
+            });
+        }
+
+        function realizarReserva(fecha, turno, hora, recurso) {
+            const confirmacion = confirm(`¿Confirmas la reserva de ${recurso} para el ${fecha} en el turno ${turno}, hora ${hora}?`);
+            
+            if (confirmacion) {
+                const nuevaReserva = {
+                    id: Date.now(),
+                    fecha: fecha,
+                    turno: turno,
+                    hora: hora,
+                    recurso: recurso,
+                    fechaReserva: new Date().toISOString()
+                };
+
+                reservas.push(nuevaReserva);
+                localStorage.setItem('reservasLiceo', JSON.stringify(reservas));
+
+                alert(`✅ Reserva realizada exitosamente!\n\n📋 Detalles:\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}`);
+                
+                // Actualizar visualización
+                consultarDisponibilidad();
+                actualizarReservas();
+                actualizarReportes();
+            }
+        }
+
+        function cancelarReserva(id) {
+            const confirmacion = confirm('¿Estás seguro de que quieres cancelar esta reserva?');
+            
+            if (confirmacion) {
+                reservas = reservas.filter(reserva => reserva.id !== id);
+                localStorage.setItem('reservasLiceo', JSON.stringify(reservas));
+                
+                alert('✅ Reserva cancelada exitosamente');
+                
+                // Actualizar visualización
+                actualizarReservas();
+                actualizarReportes();
+                consultarDisponibilidad();
+            }
+        }
+
+        function actualizarReservas() {
+            const container = document.getElementById('reservas-container');
+            
+            // Filtrar reservas activas (no pasadas)
+            const reservasActivas = reservas.filter(reserva => 
+                !esPasado(reserva.fecha, reserva.hora, reserva.turno)
+            );
+
+            if (reservasActivas.length === 0) {
+                container.innerHTML = '<div class="alert alert-warning">📭 No tienes reservas activas</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            reservasActivas.forEach(reserva => {
+                const fechaFormatted = new Date(reserva.fecha + 'T00:00:00').toLocaleDateString('es-ES');
+                
+                const item = document.createElement('div');
+                item.className = 'reserva-item';
+                item.innerHTML = `
+                    <div class="reserva-info">
+                        <div class="reserva-recurso">${reserva.recurso}</div>
+                        <div class="reserva-detalles">
+                            📅 ${fechaFormatted} | 🕒 ${reserva.turno} | ⏰ ${reserva.hora}
+                        </div>
+                    </div>
+                    <button class="btn-cancelar" onclick="cancelarReserva(${reserva.id})">
+                        ❌ Cancelar
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function actualizarReportes() {
+            const reservasActivas = reservas.filter(reserva => 
+                !esPasado(reserva.fecha, reserva.hora, reserva.turno)
+            );
+
+            const hoy = new Date().toISOString().split('T')[0];
+            const reservasHoy = reservasActivas.filter(reserva => reserva.fecha === hoy);
+
+            // Actualizar estadísticas
+            document.getElementById('total-reservas').textContent = reservasActivas.length;
+            document.getElementById('reservas-hoy').textContent = reservasHoy.length;
+            
+            // Calcular recursos disponibles totales
+            const totalRecursos = recursosMatutino.length * horasMatutino.length + 
+                                  recursosVespertino.length * horasVespertino.length;
+            document.getElementById('recursos-disponibles').textContent = totalRecursos - reservasActivas.length;
+
+            // Reporte por recursos
+            const reporteRecursos = document.getElementById('reporte-recursos');
+            const conteoRecursos = {};
+            
+            [...recursosMatutino, 'Sala de Informática', 'Salón 10'].forEach(recurso => {
+                conteoRecursos[recurso] = reservasActivas.filter(r => r.recurso === recurso).length;
+            });
+
+            reporteRecursos.innerHTML = '';
+            Object.entries(conteoRecursos).forEach(([recurso, cantidad]) => {
+                const div = document.createElement('div');
+                div.className = 'reserva-item';
+                div.innerHTML = `
+                    <div class="reserva-info">
+                        <div class="reserva-recurso">${recurso}</div>
+                        <div class="reserva-detalles">${cantidad} reservas activas</div>
+                    </div>
+                `;
+                reporteRecursos.appendChild(div);
+            });
+
+            // Reporte por turnos
+            const reporteTurnos = document.getElementById('reporte-turnos');
+            const conteoTurnos = {
+                matutino: reservasActivas.filter(r => r.turno === 'matutino').length,
+                vespertino: reservasActivas.filter(r => r.turno === 'vespertino').length
+            };
+
+            reporteTurnos.innerHTML = '';
+            Object.entries(conteoTurnos).forEach(([turno, cantidad]) => {
+                const div = document.createElement('div');
+                div.className = 'reserva-item';
+                div.innerHTML = `
+                    <div class="reserva-info">
+                        <div class="reserva-recurso">Turno ${turno.charAt(0).toUpperCase() + turno.slice(1)}</div>
+                        <div class="reserva-detalles">${cantidad} reservas activas</div>
+                    </div>
+                `;
+                reporteTurnos.appendChild(div);
+            });
+        }
+
+        function cambiarTab(tabName) {
+            // Ocultar todos los contenidos
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Desactivar todas las pestañas
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Activar pestaña y contenido seleccionados
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            event.target.classList.add('active');
+
+            // Actualizar contenido si es necesario
+            if (tabName === 'reservas') {
+                actualizarReservas();
+            } else if (tabName === 'reportes') {
+                actualizarReportes();
+            }
+        }
+
+        function limpiarSeleccion() {
+            document.getElementById('turno').value = '';
+            document.getElementById('hora').innerHTML = '<option value="">Seleccionar hora</option>';
+            document.getElementById('info-consulta').style.display = 'none';
+            document.getElementById('recursos-container').style.display = 'none';
+            document.getElementById('mensaje-inicial').style.display = 'block';
+        }
+
+        function esPasado(fecha, hora, turno) {
+            const ahora = new Date();
+            const fechaReserva = new Date(fecha + 'T00:00:00');
+            
+            // Si es un día pasado, está vencido
+            if (fechaReserva < new Date(ahora.toDateString())) {
+                return true;
+            }
+            
+            // Si es hoy, verificar la hora
+            if (fechaReserva.toDateString() === ahora.toDateString()) {
+                const horaActual = ahora.getHours();
+                
+                // Convertir hora de reserva a número
+                let horaReserva;
+                if (hora === '0') {
+                    horaReserva = 13; // 0 hora del vespertino = 13:00
+                } else if (hora.includes('era')) {
+                    const numeroHora = parseInt(hora);
+                    if (turno === 'matutino') {
+                        horaReserva = 7 + numeroHora; // 1era hora = 8:00
+                    } else {
+                        horaReserva = 13 + numeroHora; // 1era hora vespertino = 14:00
+                    }
+                }
+                
+                return horaActual > horaReserva;
+            }
+            
+            return false;
+        }
+
+        // Limpiar reservas vencidas automáticamente
+        function limpiarReservasVencidas() {
+            const reservasActivas = reservas.filter(reserva => 
+                !esPasado(reserva.fecha, reserva.hora, reserva.turno)
+            );
+            
+            if (reservasActivas.length !== reservas.length) {
+                reservas = reservasActivas;
+                localStorage.setItem('reservasLiceo', JSON.stringify(reservas));
+            }
+        }
+
+        // Ejecutar limpieza cada 5 minutos
+        setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
+        
+        // Ejecutar limpieza al cargar
+        limpiarReservasVencidas();
+    </script>
+</body>
+</html>
