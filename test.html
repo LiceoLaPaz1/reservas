@@ -2,42 +2,43 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test reserva GAS base</title>
+  <title>Test de Reserva Automática</title>
 </head>
 <body>
-  <h1>Test Reserva Básico</h1>
-  <button id="btnTest">Enviar reserva</button>
+  <h2>🔁 Test automático de reserva (sin formulario)</h2>
+  <button id="btnEnviar">📤 Enviar reserva de prueba</button>
+
   <script>
     const endpoint = "https://script.google.com/macros/s/AKfycbxyPc9vCMNYKI7zQTXLWb-3BuuNgwnK8EY4cI-2581r_BRJvtnxKPDQgtIyvf9TKZHrag/exec";
 
-    document.getElementById("btnTest").onclick = () => {
-      const reserva = {
+    document.getElementById("btnEnviar").addEventListener("click", () => {
+      const reservaDePrueba = {
         id: Date.now(),
-        nombre: "Elizabeth",
-        apellido: "Test",
         fecha: new Date().toISOString().split("T")[0],
         turno: "matutino",
-        hora: "1era",
-        recurso: "Cañón",
+        hora: "2da",
+        recurso: "Proyector",
+        nombre: "Elizabeth",
+        apellido: "Tester",
         fechaReserva: new Date().toISOString()
       };
 
-      const payload = new URLSearchParams({ data: JSON.stringify(reserva) });
+      const payload = new URLSearchParams({ data: JSON.stringify(reservaDePrueba) });
 
       fetch(endpoint, {
         method: "POST",
         body: payload
       })
       .then(res => res.text())
-      .then(text => {
-        console.log("Server responded:", text);
-        alert("Completado: " + text);
+      .then(respuesta => {
+        alert("✅ Respuesta del servidor:\n\n" + respuesta);
+        console.log("Respuesta cruda:", respuesta);
       })
       .catch(err => {
+        alert("❌ Error al conectar con el servidor:\n\n" + err.message);
         console.error("Fetch error:", err);
-        alert("Error al conectar con servidor: " + err);
       });
-    };
+    });
   </script>
 </body>
 </html>
