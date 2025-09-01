@@ -226,6 +226,7 @@ function realizarReserva(fecha, turno, hora, recurso) {
   // Enviar a Google Sheets
   const endpoint =
     "https://script.google.com/macros/s/AKfycbxZglN8LQP4UEuyyG4HekWkq4yolrEJARsrFRcXFiSzFaymYJfu-pBqwhngPH0YGZxd/exec";
+  
 
   fetch(endpoint, {
     method: "POST",
@@ -437,6 +438,69 @@ function cancelarReserva(id) {
   }
 }
 
+function realizarReserva(fecha, turno, hora, recurso) {
+  const nombre = document.getElementById("nombre").value.trim();
+  const apellido = document.getElementById("apellido").value.trim();
+
+  if (!nombre || !apellido) {
+    alert("⚠️ Por favor ingresá nombre y apellido ");
+    return;
+  }
+
+  const confirmacion = confirm(
+    `¿Confirmás la reserva de ${recurso} para el ${fecha} en el turno ${turno}, hora ${hora}, a nombre de ${nombre} ${apellido}?`
+  );
+
+  if (!confirmacion) return;
+
+  const nuevaReserva = {
+    id: Date.now(),
+    fecha: fecha,
+    turno: turno,
+    hora: hora,
+    recurso: recurso,
+    nombre: nombre,
+    apellido: apellido,
+    fechaReserva: new Date().toISOString(),
+  };
+
+  // Guardar localmente (opcional)
+  reservas.push(nuevaReserva);
+  localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
+
+  // Enviar a Google Sheets
+  const endpoint =
+    "https://script.google.com/macros/s/AKfycbxZglN8LQP4UEuyyG4HekWkq4yolrEJARsrFRcXFiSzFaymYJfu-pBqwhngPH0YGZxd/exec";
+
+  fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    // 👇 ¡IMPORTANTE! El Apps Script espera el objeto dentro de "data", y como STRING
+    body: JSON.stringify({ data: JSON.stringify(nuevaReserva) }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.status === "success") {
+        alert(
+          `✅ Reserva realizada exitosamente!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}`
+        );
+        consultarDisponibilidad();
+        actualizarReservas();
+        actualizarReportes();
+      } else {
+        alert("❌ Error al guardar en la hoja: " + data.message);
+        console.error(data);
+      }
+    })
+    .catch((error) => {
+      alert("❌ Error de conexión con el servidor.");
+      console.error("Error en fetch:", error);
+    });
+}
+
+
 function actualizarReportes() {
   const reservasActivas = reservas.filter(
     (reserva) => !esPasado(reserva.fecha, reserva.hora, reserva.turno)
@@ -588,4 +652,5 @@ setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
 
 // Ejecutar limpieza al cargar
 limpiarReservasVencidas();
+
 
