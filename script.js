@@ -219,20 +219,20 @@ function realizarReserva(fecha, turno, hora, recurso) {
     fechaReserva: new Date().toISOString(),
   };
 
-  // Guardar en LocalStorage (opcional, si querés mantener también en navegador)
+  // Guardar en LocalStorage (opcional)
   reservas.push(nuevaReserva);
   localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
 
-  // Enviar a Google Sheets vía Apps Script
+  // Enviar a Google Sheets
   const endpoint =
-    "https://script.google.com/macros/s/AKfycbxyPc9vCMNYKI7zQTXLWb-3BuuNgwnK8EY4cI-2581r_BRJvtnxKPDQgtIyvf9TKZHrag/exec";
+    "https://script.google.com/macros/s/AKfycbxZglN8LQP4UEuyyG4HekWkq4yolrEJARsrFRcXFiSzFaymYJfu-pBqwhngPH0YGZxd/exec";
 
   fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ data: JSON.stringify(nuevaReserva) }),
+    body: JSON.stringify(nuevaReserva), // ⬅️ NO envolvemos en { data: ... }, se envía el JSON directo
   })
     .then((res) => res.json())
     .then((data) => {
@@ -253,6 +253,7 @@ function realizarReserva(fecha, turno, hora, recurso) {
       console.error("Error en fetch:", error);
     });
 }
+
 
 function enviarAGoogleSheets(
   url,
@@ -587,3 +588,4 @@ setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
 
 // Ejecutar limpieza al cargar
 limpiarReservasVencidas();
+
