@@ -1,101 +1,67 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Reservas UTU</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        padding: 2em;
-        max-width: 600px;
-        margin: auto;
-      }
-      label, input, select {
-        display: block;
-        margin-bottom: 1em;
-        width: 100%;
-      }
-      button {
-        padding: 0.6em 1.2em;
-        background-color: #1a73e8;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      .mensaje {
-        margin-top: 1em;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Reservar recurso</h1>
-    <form id="formReserva">
-      <label for="nombre">Nombre:</label>
-      <input type="text" id="nombre" required />
-
-      <label for="apellido">Apellido:</label>
-      <input type="text" id="apellido" required />
-
-      <label for="fecha">Fecha:</label>
-      <input type="date" id="fecha" required />
-
-      <label for="turno">Turno:</label>
-      <select id="turno" required>
+<head>
+  <meta charset="UTF-8" />
+  <title>Test Reserva</title>
+</head>
+<body>
+  <h1>Formulario de Prueba</h1>
+  <form id="formulario">
+    <label>Nombre: <input type="text" name="nombre" required></label><br>
+    <label>Apellido: <input type="text" name="apellido" required></label><br>
+    <label>Fecha: <input type="date" name="fecha" required></label><br>
+    <label>Turno:
+      <select name="turno">
         <option value="matutino">Matutino</option>
         <option value="vespertino">Vespertino</option>
       </select>
+    </label><br>
+    <label>Hora: <input type="text" name="hora" value="1era"></label><br>
+    <label>Recurso: <input type="text" name="recurso" value="Cañón"></label><br>
+    <button type="submit">Enviar</button>
+  </form>
 
-      <label for="hora">Hora:</label>
-      <select id="hora" required>
-        <option value="1era">1era</option>
-        <option value="2da">2da</option>
-        <option value="3era">3era</option>
-      </select>
+  <script>
+    const form = document.getElementById("formulario");
 
-      <label for="recurso">Recurso:</label>
-      <input type="text" id="recurso" required />
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
 
-      <button type="submit">Reservar</button>
-    </form>
+      const datos = {
+        id: Date.now(),
+        nombre: form.nombre.value,
+        apellido: form.apellido.value,
+        fecha: form.fecha.value,
+        turno: form.turno.value,
+        hora: form.hora.value,
+        recurso: form.recurso.value,
+        fechaReserva: new Date().toISOString()
+      };
 
-    <div class="mensaje" id="mensaje"></div>
+      const endpoint = "https://script.google.com/macros/s/AKfycbxyPc9vCMNYKI7zQTXLWb-3BuuNgwnK8EY4cI-2581r_BRJvtnxKPDQgtIyvf9TKZHrag/exec";
 
-    <script>
-      const form = document.getElementById("formReserva");
-      const mensaje = document.getElementById("mensaje");
-
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-
-        const reserva = {
-          id: Date.now(),
-          nombre: document.getElementById("nombre").value.trim(),
-          apellido: document.getElementById("apellido").value.trim(),
-          fecha: document.getElementById("fecha").value,
-          turno: document.getElementById("turno").value,
-          hora: document.getElementById("hora").value,
-          recurso: document.getElementById("recurso").value.trim(),
-          fechaReserva: new Date().toISOString()
-        };
-
-        const response = await fetch("https://script.google.com/macros/s/AKfycbxyPc9vCMNYKI7zQTXLWb-3BuuNgwnK8EY4cI-2581r_BRJvtnxKPDQgtIyvf9TKZHrag/exec", {
-          method: "POST",
-          body: JSON.stringify({ data: reserva })
-        });
-
-        try {
-          const resultado = await response.json();
-          if (resultado.status === "success") {
-            mensaje.textContent = "✅ ¡Reserva registrada exitosamente!";
-          } else {
-            mensaje.textContent = "❌ Error: " + resultado.message;
-          }
-        } catch (error) {
-          mensaje.textContent = "❌ Error de conexión con el servidor.";
-        }
+      const payload = new URLSearchParams({
+        data: JSON.stringify(datos)
       });
-    </script>
-  </body>
-</html>
 
+      fetch(endpoint, {
+        method: "POST",
+        body: payload
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log("Respuesta del servidor:", data);
+          if (data.status === "success") {
+            alert("✅ ¡Reserva registrada con éxito!");
+          } else {
+            alert("⚠️ Error del servidor: " + data.message);
+          }
+        })
+        .catch(error => {
+          console.error("❌ Error en fetch:", error);
+          alert("❌ Error al conectar con el servidor.");
+        });
+    });
+  </script>
+</body>
+</html>
