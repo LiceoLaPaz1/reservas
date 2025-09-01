@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test Reserva Liceo</title>
+  </head>
+  <body>
+    <h2>Formulario de prueba de reservas</h2>
+    <form id="formReserva">
+      <label>Nombre: <input type="text" id="nombre" required /></label><br />
+      <label>Apellido: <input type="text" id="apellido" required /></label
+      ><br />
+      <label>Fecha: <input type="date" id="fecha" required /></label><br />
+      <label
+        >Turno:
+        <select id="turno">
+          <option value="matutino">Matutino</option>
+          <option value="vespertino">Vespertino</option>
+        </select> </label
+      ><br />
+      <label>Hora: <input type="text" id="hora" value="1era" required /></label
+      ><br />
+      <label
+        >Recurso:
+        <input type="text" id="recurso" value="Cañón" required /></label
+      ><br />
+      <button type="submit">Reservar</button>
+    </form>
+
+    <script>
+      const endpoint =
+        "https://script.google.com/macros/s/AKfycbxyPc9vCMNYKI7zQTXLWb-3BuuNgwnK8EY4cI-2581r_BRJvtnxKPDQgtIyvf9TKZHrag/exec";
+
+      document
+        .getElementById("formReserva")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+
+          const nuevaReserva = {
+            id: Date.now(),
+            fecha: document.getElementById("fecha").value,
+            turno: document.getElementById("turno").value,
+            hora: document.getElementById("hora").value,
+            recurso: document.getElementById("recurso").value,
+            nombre: document.getElementById("nombre").value,
+            apellido: document.getElementById("apellido").value,
+            fechaReserva: new Date().toISOString(),
+          };
+
+          const payload = JSON.stringify(nuevaReserva);
+
+          fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ data: payload }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.status === "success") {
+                alert("✅ Reserva guardada correctamente");
+                console.log(data);
+              } else {
+                alert("❌ Error en el servidor: " + data.message);
+                console.error(data);
+              }
+            })
+            .catch((error) => {
+              alert("❌ Error de conexión con el servidor.");
+              console.error("Fetch error:", error);
+            });
+        });
+    </script>
+  </body>
+</html>

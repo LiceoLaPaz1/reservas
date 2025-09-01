@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>📅 Gestor de Reservas - Recursos del Liceo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>📅 Gestor de Reservas</h1>
+        <p>Sistema de Reserva de Recursos del Liceo</p>
+      </div>
+
+      <div class="main-content">
+        <div class="left-panel">
+          <h3>🔍 Consultar Disponibilidad</h3>
+          <div class="form-group">
+            <label for="nombre">👤 Nombre del docente:</label>
+            <input type="text" id="nombre" placeholder="Ej: Ana" />
+          </div>
+
+          <div class="form-group">
+            <label for="apellido">👤 Apellido del docente:</label>
+            <input type="text" id="apellido" placeholder="Ej: Gómez" />
+          </div>
+
+          <div class="form-group">
+            <label for="fecha">📅 Fecha:</label>
+            <input
+              type="date"
+              id="fecha"
+              onchange="actualizarDisponibilidad()"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="turno">🕒 Turno:</label>
+            <select id="turno" onchange="actualizarHoras()">
+              <option value="">Seleccionar turno</option>
+              <option value="matutino">Matutino (1era a 8va)</option>
+              <option value="vespertino">Vespertino (0 a 7ma)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="hora">⏰ Hora:</label>
+            <select id="hora" onchange="actualizarDisponibilidad()">
+              <option value="">Seleccionar hora</option>
+            </select>
+          </div>
+
+          <button class="btn" onclick="consultarDisponibilidad()">
+            🔍 Consultar Disponibilidad
+          </button>
+
+          <button class="btn btn-secondary" onclick="limpiarSeleccion()">
+            🗑️ Limpiar
+          </button>
+        </div>
+
+        <div class="right-panel">
+          <div class="tabs">
+            <div class="tab active" onclick="cambiarTab('disponibilidad')">
+              📋 Disponibilidad
+            </div>
+            <div class="tab" onclick="cambiarTab('reservas')">
+              📝 Mis Reservas
+            </div>
+            <div class="tab" onclick="cambiarTab('reportes')">📊 Reportes</div>
+          </div>
+
+          <div id="tab-disponibilidad" class="tab-content active">
+            <div id="info-consulta" style="display: none">
+              <div class="info-seleccion">
+                <h3>📍 Consulta Actual</h3>
+                <div id="detalles-consulta"></div>
+              </div>
+            </div>
+
+            <div id="mensaje-inicial" class="alert alert-warning">
+              👆 Selecciona fecha, turno y hora para ver los recursos
+              disponibles
+            </div>
+
+            <div id="recursos-container" style="display: none">
+              <h3>🎯 Recursos Disponibles</h3>
+              <div id="recursos-grid" class="recursos-grid"></div>
+            </div>
+          </div>
+
+          <div id="tab-reservas" class="tab-content">
+            <h3>📝 Mis Reservas Activas</h3>
+            <div id="reservas-container" class="reservas-list"></div>
+          </div>
+
+          <div id="tab-reportes" class="tab-content">
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-number" id="total-reservas">0</div>
+                <div class="stat-label">Total Reservas</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="reservas-hoy">0</div>
+                <div class="stat-label">Reservas Hoy</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="recursos-disponibles">0</div>
+                <div class="stat-label">Recursos Disponibles</div>
+              </div>
+            </div>
+
+            <h3>📊 Reservas por Recurso</h3>
+            <div id="reporte-recursos"></div>
+
+            <h3>📅 Reservas por Turno</h3>
+            <div id="reporte-turnos"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+     <footer>
+      <p>
+        Creado por: Elizabeth Izquierdo<br />
+        · Licencia
+        <a
+          href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
+          target="_blank"
+          >CC BY-NC-SA 4.0</a
+        >
+      </p>
+    </footer>
+
+    <script src="script.js"></script>
+
+  </body>
+</html>
