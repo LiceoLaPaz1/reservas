@@ -1,75 +1,43 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Test Reserva</title>
+  <meta charset="UTF-8">
+  <title>Test reserva GAS base</title>
 </head>
 <body>
-  <h1>Formulario de Prueba</h1>
-  <form id="formulario">
-    <label>Nombre: <input type="text" name="nombre" required></label><br>
-    <label>Apellido: <input type="text" name="apellido" required></label><br>
-    <label>Fecha: <input type="date" name="fecha" required></label><br>
-    <label>Turno:
-      <select name="turno">
-        <option value="matutino">Matutino</option>
-        <option value="vespertino">Vespertino</option>
-      </select>
-    </label><br>
-    <label>Hora: <input type="text" name="hora" value="1era"></label><br>
-    <label>Recurso: <input type="text" name="recurso" value="Cañón"></label><br>
-    <button type="submit">Enviar</button>
-  </form>
-
+  <h1>Test Reserva Básico</h1>
+  <button id="btnTest">Enviar reserva</button>
   <script>
-    const form = document.getElementById("formulario");
+    const endpoint = "https://script.google.com/macros/s/AKfycbxyPc9vCMNYKI7zQTXLWb-3BuuNgwnK8EY4cI-2581r_BRJvtnxKPDQgtIyvf9TKZHrag/exec";
 
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-
-      const datos = {
+    document.getElementById("btnTest").onclick = () => {
+      const reserva = {
         id: Date.now(),
-        nombre: form.nombre.value,
-        apellido: form.apellido.value,
-        fecha: form.fecha.value,
-        turno: form.turno.value,
-        hora: form.hora.value,
-        recurso: form.recurso.value,
+        nombre: "Elizabeth",
+        apellido: "Test",
+        fecha: new Date().toISOString().split("T")[0],
+        turno: "matutino",
+        hora: "1era",
+        recurso: "Cañón",
         fechaReserva: new Date().toISOString()
       };
 
-      const endpoint = "https://script.google.com/macros/s/AKfycbxyPc9vCMNYKI7zQTXLWb-3BuuNgwnK8EY4cI-2581r_BRJvtnxKPDQgtIyvf9TKZHrag/exec";
+      const payload = new URLSearchParams({ data: JSON.stringify(reserva) });
 
-      const payload = new URLSearchParams({
-        data: JSON.stringify(datos)
+      fetch(endpoint, {
+        method: "POST",
+        body: payload
+      })
+      .then(res => res.text())
+      .then(text => {
+        console.log("Server responded:", text);
+        alert("Completado: " + text);
+      })
+      .catch(err => {
+        console.error("Fetch error:", err);
+        alert("Error al conectar con servidor: " + err);
       });
-
-    fetch(endpoint, {
-  method: "POST",
-  body: payload
-})
-  .then(async response => {
-    const text = await response.text();
-    try {
-      const data = JSON.parse(text);
-      console.log("Respuesta del servidor (parseada):", data);
-      if (data.status === "success") {
-        alert("✅ ¡Reserva registrada con éxito!");
-      } else {
-        alert("⚠️ Error del servidor: " + data.message);
-      }
-    } catch (e) {
-      console.error("❌ Respuesta no JSON:", text);
-      alert("❌ El servidor devolvió una respuesta inesperada:\n" + text);
-    }
-  })
-  .catch(error => {
-    console.error("❌ Error en fetch:", error);
-    alert("❌ Error al conectar con el servidor.");
-  });
-
-    });
+    };
   </script>
 </body>
 </html>
-
