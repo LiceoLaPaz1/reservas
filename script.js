@@ -1,4 +1,17 @@
-// ===== Configuración de recursos por turno =====
+/************************************************************
+ * Reserva de recursos - Frontend
+ * - Chequeo server-side (doGet?action=check)
+ * - Alta atómica (doPost) y actualización local condicionada
+ ************************************************************/
+
+/* =================== Configuración =================== */
+
+// ENDPOINT del Web App (podés sobreescribirlo con ?api=URL en la barra)
+const endpoint =
+  new URLSearchParams(location.search).get("api") ||
+  "https://script.google.com/macros/s/AKfycbwfQdx0QdsB6zZW6AhE3793Tc0Qu4y0-2eSTcGP9Uj6SkRTiaQ6yFk7Xp5Qze8gp-CZ/exec";
+
+// Recursos por turno
 const recursosMatutino = [
   "Cañón",
   "TV Planta Baja",
@@ -41,11 +54,20 @@ const horasVespertino = [
   "7ma",
 ];
 
-// ===== Estado =====
+/* =================== Estado =================== */
+
 let reservas = [];
 let reservaEnProgreso = false;
 
-// ===== Helpers generales =====
+// Carga robusta desde localStorage
+try {
+  reservas = JSON.parse(localStorage.getItem("reservasLiceo")) || [];
+} catch {
+  reservas = [];
+}
+
+/* =================== Helpers generales =================== */
+
 function getDuracion() {
   const el = document.getElementById("duracion");
   const n = el ? parseInt(el.value, 10) : 1;
@@ -73,12 +95,15 @@ function getTodosLosRecursos() {
   return Array.from(new Set([...recursosMatutino, ...recursosVespertino]));
 }
 
-// ===== Inicialización =====
-try {
-  reservas = JSON.parse(localStorage.getItem("reservasLiceo")) || [];
-} catch {
-  reservas = [];
+// Simplificado: una reserva es "pasada" solo si la fecha < hoy
+function esPasado(fecha) {
+  const hoyStr = new Date().toISOString().split("T")[0];
+  if (fecha < hoyStr) return true;
+  if (fecha > hoyStr) return false;
+  return false; // mismo día => activo
 }
+
+/* =================== Inicialización =================== */
 
 document.addEventListener("DOMContentLoaded", () => {
   const hoy = new Date().toISOString().split("T")[0];
@@ -90,7 +115,8 @@ document.addEventListener("DOMContentLoaded", () => {
   limpiarReservasVencidas();
 });
 
-// ===== Listado de reservas activas =====
+/* =================== UI: listado de reservas =================== */
+
 function actualizarReservas() {
   const container = document.getElementById("reservas-container");
   if (!container) return;
@@ -124,7 +150,8 @@ function actualizarReservas() {
   });
 }
 
-// ===== Selección de horas según turno =====
+/* =================== UI: selección de horas =================== */
+
 function actualizarHoras() {
   const turno = document.getElementById("turno").value;
   const horaSelect = document.getElementById("hora");
@@ -146,7 +173,7 @@ function actualizarHoras() {
   actualizarDisponibilidad();
 }
 
-// ===== Auto-consulta cuando hay datos =====
+// Auto-consulta cuando hay datos
 function actualizarDisponibilidad() {
   const fecha = document.getElementById("fecha").value;
   const turno = document.getElementById("turno").value;
@@ -154,7 +181,8 @@ function actualizarDisponibilidad() {
   if (fecha && turno && hora) consultarDisponibilidad();
 }
 
-// ===== Consulta de disponibilidad (soporta rango de horas) =====
+/* =================== Consulta de disponibilidad (UI local) =================== */
+
 function consultarDisponibilidad() {
   const fecha = document.getElementById("fecha").value;
   const turno = document.getElementById("turno").value;
@@ -212,7 +240,7 @@ function consultarDisponibilidad() {
   if (!recursosGrid) return;
   recursosGrid.innerHTML = "";
 
-  // Set de reservas activas actuales para pintar al instante
+  // Set de reservas activas actuales (local) para pintar al instante
   const R = buildReservasActivasSet();
 
   recursos.forEach((recurso) => {
@@ -236,7 +264,8 @@ function consultarDisponibilidad() {
   });
 }
 
-// ===== Reserva multi-hora (con bloqueo de doble-reserva) =====
+/* =================== Reserva multi-hora con chequeo server-side =================== */
+
 async function realizarReserva(fecha, turno, hora, recurso) {
   if (reservaEnProgreso) return; // evita doble click
   reservaEnProgreso = true;
@@ -253,7 +282,6 @@ async function realizarReserva(fecha, turno, hora, recurso) {
 
     const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
     const indiceHora = horasTurno.indexOf(hora);
-
     if (indiceHora === -1) {
       alert("⚠️ Hora inválida");
       return;
@@ -268,65 +296,100 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       indiceHora + duracion
     );
 
-    // ===== Chequeo local anti-duplicado =====
-    const R = buildReservasActivasSet();
-    const conflictoLocal = horasSeleccionadas.some((hSel) =>
-      R.has(buildKey(fecha, turno, hSel, recurso))
-    );
-    if (conflictoLocal) {
-      alert("❌ Esa franja ya está reservada.");
+    // --- 1) Chequeo server-side de todo el bloque de horas ---
+    const url = new URL(endpoint);
+    url.searchParams.set("action", "check");
+    url.searchParams.set("fecha", fecha);
+    url.searchParams.set("turno", turno);
+    url.searchParams.set("recurso", recurso);
+    url.searchParams.set("horas", horasSeleccionadas.join(","));
+
+    let checkOk = true;
+    try {
+      const resp = await fetch(url.toString());
+      const data = await resp.json();
+      if (data.status !== "ok" || !data.disponible) {
+        checkOk = false;
+      }
+    } catch (e) {
+      console.warn(
+        "No se pudo verificar disponibilidad en servidor (continuará con intento atómico por hora):",
+        e
+      );
+      // seguimos igual: el POST atómico igual bloqueará si hay conflicto
+    }
+
+    if (!checkOk) {
+      alert("❌ Esa franja ya está reservada por otro docente.");
+      consultarDisponibilidad();
+      actualizarReservas();
+      actualizarReportes();
       return;
     }
 
-    const confirmacion = confirm(
-      `¿Confirmás la reserva de ${recurso} para el ${fecha}, turno ${turno}, desde la hora ${hora} por ${duracion} hora(s), a nombre de ${nombre} ${apellido}?`
-    );
-    if (!confirmacion) return;
-
-    const endpoint =
-      new URLSearchParams(location.search).get("api") ||
-      "https://script.google.com/macros/s/AKfycbwfQdx0QdsB6zZW6AhE3793Tc0Qu4y0-2eSTcGP9Uj6SkRTiaQ6yFk7Xp5Qze8gp-CZ/exec";
-
-    // Crear y enviar una fila por cada hora seleccionada
-    horasSeleccionadas.forEach((h, i) => {
+    // --- 2) POST por cada hora (con bloqueo en backend) ---
+    const posts = horasSeleccionadas.map((h, i) => {
       const nuevaReserva = {
         id: Date.now() + i + Math.floor(Math.random() * 1000),
-        fecha: fecha,
-        turno: turno,
+        fecha,
+        turno,
         hora: h,
-        recurso: recurso,
-        nombre: nombre,
-        apellido: apellido,
-        cantidadHoras: duracion, // para la hoja (columna H)
+        recurso,
+        nombre,
+        apellido,
+        cantidadHoras: duracion,
         fechaReserva: new Date().toISOString(),
       };
 
-      // Guardar localmente primero para que la UI se pinte en rojo al instante
-      reservas.push(nuevaReserva);
-
       const formData = new URLSearchParams();
       formData.append("data", JSON.stringify(nuevaReserva));
-      // formData.append("debug", "1"); // <- activar si querés ver columnas en respuesta
 
-      fetch(endpoint, {
+      return fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData,
       })
-        .then((res) => res.text())
-        .then((data) => console.log("📥 Respuesta del servidor:", data))
-        .catch((error) => console.error("❌ Error en fetch:", error));
+        .then((r) => r.json())
+        .then((r) => {
+          if (r.status === "success") {
+            // Recién acá impactamos localmente (quedará rojo)
+            reservas.push(nuevaReserva);
+            return true;
+          }
+          if (r.status === "conflict") {
+            console.warn("Conflicto detectado por el servidor:", r);
+            return false;
+          }
+          throw new Error(r.message || "Error desconocido al reservar");
+        })
+        .catch((err) => {
+          console.error("❌ Error en POST:", err);
+          return false;
+        });
     });
 
-    localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
+    const results = await Promise.all(posts);
+    const okCount = results.filter(Boolean).length;
 
-    alert(
-      `✅ Reserva realizada!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Horas: ${horasSeleccionadas.join(
-        ", "
-      )}`
-    );
+    if (okCount === horasSeleccionadas.length) {
+      localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
+      alert(
+        `✅ Reserva realizada!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Horas: ${horasSeleccionadas.join(
+          ", "
+        )}`
+      );
+    } else if (okCount > 0) {
+      localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
+      alert(
+        "⚠️ La reserva se concretó parcialmente (algunas horas ya estaban tomadas)."
+      );
+    } else {
+      alert(
+        "❌ No se pudo realizar la reserva. Puede que la franja ya esté ocupada."
+      );
+    }
 
-    // Refrescar UI y reportes
+    // Refrescar UI
     consultarDisponibilidad();
     actualizarReservas();
     actualizarReportes();
@@ -335,7 +398,8 @@ async function realizarReserva(fecha, turno, hora, recurso) {
   }
 }
 
-// ===== Cancelar reserva =====
+/* =================== Cancelación =================== */
+
 function cancelarReserva(id) {
   const confirmacion = confirm(
     "¿Estás seguro de que querés cancelar esta reserva?"
@@ -351,7 +415,8 @@ function cancelarReserva(id) {
   consultarDisponibilidad();
 }
 
-// ===== Reportes =====
+/* =================== Reportes =================== */
+
 function actualizarReportes() {
   const reservasActivas = reservas.filter((r) => !esPasado(r.fecha));
 
@@ -419,7 +484,8 @@ function actualizarReportes() {
   }
 }
 
-// ===== Tabs =====
+/* =================== Tabs =================== */
+
 function cambiarTab(tabName) {
   document
     .querySelectorAll(".tab-content")
@@ -437,14 +503,7 @@ function cambiarTab(tabName) {
   if (tabName === "reportes") actualizarReportes();
 }
 
-// ===== Vencimiento de reservas =====
-// Simplificado: una reserva es "pasada" sólo si la fecha es anterior a hoy.
-function esPasado(fecha) {
-  const hoyStr = new Date().toISOString().split("T")[0];
-  if (fecha < hoyStr) return true;
-  if (fecha > hoyStr) return false;
-  return false; // mismo día => activo
-}
+/* =================== Limpieza / mantenimiento =================== */
 
 function limpiarReservasVencidas() {
   const activas = reservas.filter((r) => !esPasado(r.fecha));
@@ -455,7 +514,7 @@ function limpiarReservasVencidas() {
 }
 setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
 
-// ===== Limpiar selección (arreglado) =====
+// Botón Limpiar: resetea la UI de consulta
 function limpiarSeleccion() {
   const turnoEl = document.getElementById("turno");
   const horaEl = document.getElementById("hora");
@@ -469,7 +528,6 @@ function limpiarSeleccion() {
   if (turnoEl) turnoEl.value = "";
   if (horaEl) {
     horaEl.innerHTML = '<option value="">Seleccionar hora</option>';
-    // horaEl.disabled = true; // si querés deshabilitar hasta elegir turno
   }
   if (durEl) durEl.value = 1;
   if (info) info.style.display = "none";
@@ -479,7 +537,8 @@ function limpiarSeleccion() {
   if (grid) grid.innerHTML = "";
 }
 
-// ===== Debug =====
+/* =================== Debug (opcional) =================== */
+
 function debugReserva() {
   console.log("Reservas actuales:", reservas);
   console.log("Fecha actual:", new Date().toISOString().split("T")[0]);
