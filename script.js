@@ -19,6 +19,7 @@ const recursosVespertino = [
   "Salón 10",
 ];
 
+// Horas por turno
 const horasMatutino = [
   "1era",
   "2da",
@@ -66,14 +67,30 @@ document.addEventListener("DOMContentLoaded", function () {
   limpiarReservasVencidas();
 });
 
+// ===== Helpers =====
+
+// Conjunto de reservas activas (clave: fecha|turno|hora|recurso)
+function buildReservasActivasSet() {
+  const s = new Set();
+  reservas.forEach((r) => {
+    if (!esPasado(r.fecha)) {
+      s.add(`${r.fecha}|${r.turno}|${r.hora}|${r.recurso}`);
+    }
+  });
+  return s;
+}
+
+// Unificar recursos (evitar duplicados entre turnos)
+function getTodosLosRecursos() {
+  return Array.from(new Set([...recursosMatutino, ...recursosVespertino]));
+}
+
 // ===== Listado de reservas activas =====
 function actualizarReservas() {
   const container = document.getElementById("reservas-container");
   if (!container) return;
 
-  const reservasActivas = reservas.filter(
-    (reserva) => !esPasado(reserva.fecha, reserva.hora, reserva.turno)
-  );
+  const reservasActivas = reservas.filter((r) => !esPasado(r.fecha));
 
   if (reservasActivas.length === 0) {
     container.innerHTML =
@@ -191,27 +208,26 @@ function consultarDisponibilidad() {
   if (!recursosGrid) return;
   recursosGrid.innerHTML = "";
 
+  // Set de reservas activas actuales para pintar al instante
+  const R = buildReservasActivasSet();
+
   recursos.forEach((recurso) => {
-    const estaReservado = reservas.some(
-      (reserva) =>
-        reserva.fecha === fecha &&
-        reserva.turno === turno &&
-        horasSeleccionadas.includes(reserva.hora) &&
-        reserva.recurso === recurso &&
-        !esPasado(reserva.fecha, reserva.hora, reserva.turno)
+    // Ocupado si alguna hora seleccionada está reservada
+    const ocupado = horasSeleccionadas.some((hSel) =>
+      R.has(`${fecha}|${turno}|${hSel}|${recurso}`)
     );
 
     const card = document.createElement("div");
-    card.className = `recurso-card ${estaReservado ? "ocupado" : "disponible"}`;
+    card.className = `recurso-card ${ocupado ? "ocupado" : "disponible"}`;
     card.innerHTML = `
       <div class="recurso-nombre">${recurso}</div>
       <div class="recurso-estado ${
-        estaReservado ? "estado-ocupado" : "estado-disponible"
+        ocupado ? "estado-ocupado" : "estado-disponible"
       }">
-        ${estaReservado ? "❌ Ocupado" : "✅ Disponible"}
+        ${ocupado ? "❌ Ocupado" : "✅ Disponible"}
       </div>
     `;
-    if (!estaReservado)
+    if (!ocupado)
       card.onclick = () => realizarReserva(fecha, turno, hora, recurso);
     recursosGrid.appendChild(card);
   });
@@ -252,7 +268,7 @@ function realizarReserva(fecha, turno, hora, recurso) {
       reserva.turno === turno &&
       horasSeleccionadas.includes(reserva.hora) &&
       reserva.recurso === recurso &&
-      !esPasado(reserva.fecha, reserva.hora, reserva.turno)
+      !esPasado(reserva.fecha)
   );
   if (conflicto) {
     alert("❌ Alguna de las horas seleccionadas ya está reservada.");
@@ -265,21 +281,23 @@ function realizarReserva(fecha, turno, hora, recurso) {
   if (!confirmacion) return;
 
   const endpoint =
-    "https://script.google.com/macros/s/AKfycbxZglN8LQP4UEuyyG4HekWkq4yolrEJARsrFRcXFiSzFaymYJfu-pBqwhngPH0YGZxd/exec";
+    "https://script.google.com/macros/s/AKfycbwfQdx0QdsB6zZW6AhE3793Tc0Qu4y0-2eSTcGP9Uj6SkRTiaQ6yFk7Xp5Qze8gp-CZ/exec";
 
+  // Crear y enviar una fila por cada hora seleccionada
   horasSeleccionadas.forEach((h, i) => {
     const nuevaReserva = {
-      id: Date.now() + i + Math.floor(Math.random() * 1000), // entero para ID
+      id: Date.now() + i + Math.floor(Math.random() * 1000),
       fecha: fecha,
       turno: turno,
       hora: h,
       recurso: recurso,
       nombre: nombre,
       apellido: apellido,
-      cantidadHoras: duracion,
+      cantidadHoras: duracion, // <--- NUEVO CAMPO para la hoja
       fechaReserva: new Date().toISOString(),
     };
 
+    // Guardar localmente primero para que la UI se pinte en rojo al instante
     reservas.push(nuevaReserva);
 
     const formData = new URLSearchParams();
@@ -303,6 +321,7 @@ function realizarReserva(fecha, turno, hora, recurso) {
     )}`
   );
 
+  // Refrescar UI y reportes
   consultarDisponibilidad();
   actualizarReservas();
   actualizarReportes();
@@ -326,14 +345,10 @@ function cancelarReserva(id) {
 
 // ===== Reportes =====
 function actualizarReportes() {
-  const reservasActivas = reservas.filter(
-    (reserva) => !esPasado(reserva.fecha, reserva.hora, reserva.turno)
-  );
+  const reservasActivas = reservas.filter((r) => !esPasado(r.fecha));
 
   const hoy = new Date().toISOString().split("T")[0];
-  const reservasHoy = reservasActivas.filter(
-    (reserva) => reserva.fecha === hoy
-  );
+  const reservasHoy = reservasActivas.filter((r) => r.fecha === hoy);
 
   const totalEl = document.getElementById("total-reservas");
   const hoyEl = document.getElementById("reservas-hoy");
@@ -346,16 +361,15 @@ function actualizarReportes() {
     recursosVespertino.length * horasVespertino.length;
   if (dispEl) dispEl.textContent = totalRecursos - reservasActivas.length;
 
+  // Reporte por recurso (sin duplicados)
   const reporteRecursos = document.getElementById("reporte-recursos");
   if (reporteRecursos) {
     const conteoRecursos = {};
-    [...recursosMatutino, "Sala de Informática", "Salón 10"].forEach(
-      (recurso) => {
-        conteoRecursos[recurso] = reservasActivas.filter(
-          (r) => r.recurso === recurso
-        ).length;
-      }
-    );
+    getTodosLosRecursos().forEach((recurso) => {
+      conteoRecursos[recurso] = reservasActivas.filter(
+        (r) => r.recurso === recurso
+      ).length;
+    });
 
     reporteRecursos.innerHTML = "";
     Object.entries(conteoRecursos).forEach(([recurso, cantidad]) => {
@@ -371,6 +385,7 @@ function actualizarReportes() {
     });
   }
 
+  // Reporte por turno
   const reporteTurnos = document.getElementById("reporte-turnos");
   if (reporteTurnos) {
     const conteoTurnos = {
@@ -417,40 +432,17 @@ function cambiarTab(tabName) {
 }
 
 // ===== Vencimiento de reservas =====
-// Convierte etiquetas "1era", "2da", "3era", "4ta", "5ta", "6ta", "7ma", "8va" y "0" a índice 0..8
-function labelAHoraIndice(label) {
-  if (label === "0") return 0;
-  const m = (label || "").match(/\d+/);
-  return m ? parseInt(m[0], 10) : NaN;
-}
-
-function esPasado(fecha, hora, turno) {
-  const ahora = new Date();
-  const fechaReserva = new Date(fecha + "T00:00:00");
-
-  // Si la fecha es anterior a hoy
-  if (fechaReserva < new Date(ahora.toDateString())) return true;
-
-  // Si es hoy, comparar horas reales
-  if (fechaReserva.toDateString() === ahora.toDateString()) {
-    const idx = labelAHoraIndice(hora); // 0..8
-    if (!Number.isFinite(idx)) return false; // formato desconocido -> no marcar como pasado
-
-    // Mapeo simple a hora real (aprox):
-    // Matutino: 1era->08:00 (idx=1 => 7+1), 8va->15:00, etc.
-    // Vespertino: 0->13:00, 1era->14:00, etc.
-    let horaReserva = turno === "matutino" ? 7 + idx : 13 + idx;
-
-    const horaActual = ahora.getHours();
-    return horaActual > horaReserva;
-  }
-  return false;
+// Simplificado: solo se consideran "pasadas" si la fecha es anterior a hoy.
+// (Así, durante el día actual se ven como activas y pintan en rojo.)
+function esPasado(fecha) {
+  const hoyStr = new Date().toISOString().split("T")[0];
+  if (fecha < hoyStr) return true;
+  if (fecha > hoyStr) return false;
+  return false; // mismo día => activo
 }
 
 function limpiarReservasVencidas() {
-  const activas = reservas.filter(
-    (reserva) => !esPasado(reserva.fecha, reserva.hora, reserva.turno)
-  );
+  const activas = reservas.filter((r) => !esPasado(r.fecha));
   if (activas.length !== reservas.length) {
     reservas = activas;
     localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
