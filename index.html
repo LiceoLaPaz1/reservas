@@ -51,6 +51,18 @@
             </select>
           </div>
 
+          <div class="form-group">
+            <label for="duracion">⏳ Cantidad de horas:</label>
+            <input
+              type="number"
+              id="duracion"
+              min="1"
+              max="8"
+              value="1"
+              onchange="actualizarDisponibilidad()"
+            />
+          </div>
+
           <button class="btn" onclick="consultarDisponibilidad()">
             🔍 Consultar Disponibilidad
           </button>
@@ -120,7 +132,7 @@
         </div>
       </div>
     </div>
-     <footer>
+    <footer>
       <p>
         Creado por: Elizabeth Izquierdo<br />
         · Licencia
@@ -133,7 +145,5 @@
     </footer>
 
     <script src="script.js"></script>
-
   </body>
 </html>
-
