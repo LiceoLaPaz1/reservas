@@ -5,7 +5,7 @@ const recursosMatutino = [
   "TV Planta Alta",
   'TV 43"',
   'Caja TV 50"',
-  "Caja TV 43"
+  "Caja TV 43",
 ];
 
 const recursosVespertino = [
@@ -16,11 +16,29 @@ const recursosVespertino = [
   'Caja TV 50"',
   "Caja TV 43",
   "Sala de Informática",
-  "Salón 10"
+  "Salón 10",
 ];
 
-const horasMatutino = ["1era", "2da", "3era", "4ta", "5ta", "6ta", "7ma", "8va"];
-const horasVespertino = ["0", "1era", "2da", "3era", "4ta", "5ta", "6ta", "7ma"];
+const horasMatutino = [
+  "1era",
+  "2da",
+  "3era",
+  "4ta",
+  "5ta",
+  "6ta",
+  "7ma",
+  "8va",
+];
+const horasVespertino = [
+  "0",
+  "1era",
+  "2da",
+  "3era",
+  "4ta",
+  "5ta",
+  "6ta",
+  "7ma",
+];
 
 // ===== Almacenamiento de reservas (localStorage) =====
 let reservas = [];
@@ -66,7 +84,9 @@ function actualizarReservas() {
   container.innerHTML = "";
 
   reservasActivas.forEach((reserva) => {
-    const fechaFormatted = new Date(reserva.fecha + "T00:00:00").toLocaleDateString("es-ES");
+    const fechaFormatted = new Date(
+      reserva.fecha + "T00:00:00"
+    ).toLocaleDateString("es-ES");
     const item = document.createElement("div");
     item.className = "reserva-item";
     item.innerHTML = `
@@ -139,24 +159,32 @@ function consultarDisponibilidad() {
   if (infoConsulta) infoConsulta.style.display = "block";
   if (recursosContainer) recursosContainer.style.display = "block";
 
-  const fechaFormatted = new Date(fecha + "T00:00:00").toLocaleDateString("es-ES", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
+  const fechaFormatted = new Date(fecha + "T00:00:00").toLocaleDateString(
+    "es-ES",
+    {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }
+  );
 
   const detalles = document.getElementById("detalles-consulta");
   if (detalles) {
     detalles.innerHTML = `
       <strong>📅 Fecha:</strong> ${fechaFormatted}<br>
-      <strong>🕒 Turno:</strong> ${turno.charAt(0).toUpperCase() + turno.slice(1)}<br>
+      <strong>🕒 Turno:</strong> ${
+        turno.charAt(0).toUpperCase() + turno.slice(1)
+      }<br>
       <strong>⏰ Hora inicial:</strong> ${hora}<br>
       <strong>⏳ Duración:</strong> ${duracion} hora(s)
     `;
   }
 
-  const horasSeleccionadas = horasTurno.slice(indiceHora, indiceHora + duracion);
+  const horasSeleccionadas = horasTurno.slice(
+    indiceHora,
+    indiceHora + duracion
+  );
 
   const recursos = turno === "matutino" ? recursosMatutino : recursosVespertino;
   const recursosGrid = document.getElementById("recursos-grid");
@@ -177,11 +205,14 @@ function consultarDisponibilidad() {
     card.className = `recurso-card ${estaReservado ? "ocupado" : "disponible"}`;
     card.innerHTML = `
       <div class="recurso-nombre">${recurso}</div>
-      <div class="recurso-estado ${estaReservado ? "estado-ocupado" : "estado-disponible"}">
+      <div class="recurso-estado ${
+        estaReservado ? "estado-ocupado" : "estado-disponible"
+      }">
         ${estaReservado ? "❌ Ocupado" : "✅ Disponible"}
       </div>
     `;
-    if (!estaReservado) card.onclick = () => realizarReserva(fecha, turno, hora, recurso);
+    if (!estaReservado)
+      card.onclick = () => realizarReserva(fecha, turno, hora, recurso);
     recursosGrid.appendChild(card);
   });
 }
@@ -210,7 +241,10 @@ function realizarReserva(fecha, turno, hora, recurso) {
     return;
   }
 
-  const horasSeleccionadas = horasTurno.slice(indiceHora, indiceHora + duracion);
+  const horasSeleccionadas = horasTurno.slice(
+    indiceHora,
+    indiceHora + duracion
+  );
 
   const conflicto = reservas.some(
     (reserva) =>
@@ -242,7 +276,8 @@ function realizarReserva(fecha, turno, hora, recurso) {
       recurso: recurso,
       nombre: nombre,
       apellido: apellido,
-      fechaReserva: new Date().toISOString()
+      cantidadHoras: duracion,
+      fechaReserva: new Date().toISOString(),
     };
 
     reservas.push(nuevaReserva);
@@ -253,7 +288,7 @@ function realizarReserva(fecha, turno, hora, recurso) {
     fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData
+      body: formData,
     })
       .then((res) => res.text())
       .then((data) => console.log("📥 Respuesta del servidor:", data))
@@ -263,7 +298,9 @@ function realizarReserva(fecha, turno, hora, recurso) {
   localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
 
   alert(
-    `✅ Reserva realizada!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Horas: ${horasSeleccionadas.join(", ")}`
+    `✅ Reserva realizada!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Horas: ${horasSeleccionadas.join(
+      ", "
+    )}`
   );
 
   consultarDisponibilidad();
@@ -273,7 +310,9 @@ function realizarReserva(fecha, turno, hora, recurso) {
 
 // ===== Cancelar reserva =====
 function cancelarReserva(id) {
-  const confirmacion = confirm("¿Estás seguro de que quieres cancelar esta reserva?");
+  const confirmacion = confirm(
+    "¿Estás seguro de que quieres cancelar esta reserva?"
+  );
   if (!confirmacion) return;
 
   reservas = reservas.filter((reserva) => reserva.id !== id);
@@ -292,7 +331,9 @@ function actualizarReportes() {
   );
 
   const hoy = new Date().toISOString().split("T")[0];
-  const reservasHoy = reservasActivas.filter((reserva) => reserva.fecha === hoy);
+  const reservasHoy = reservasActivas.filter(
+    (reserva) => reserva.fecha === hoy
+  );
 
   const totalEl = document.getElementById("total-reservas");
   const hoyEl = document.getElementById("reservas-hoy");
@@ -308,9 +349,13 @@ function actualizarReportes() {
   const reporteRecursos = document.getElementById("reporte-recursos");
   if (reporteRecursos) {
     const conteoRecursos = {};
-    [...recursosMatutino, "Sala de Informática", "Salón 10"].forEach((recurso) => {
-      conteoRecursos[recurso] = reservasActivas.filter((r) => r.recurso === recurso).length;
-    });
+    [...recursosMatutino, "Sala de Informática", "Salón 10"].forEach(
+      (recurso) => {
+        conteoRecursos[recurso] = reservasActivas.filter(
+          (r) => r.recurso === recurso
+        ).length;
+      }
+    );
 
     reporteRecursos.innerHTML = "";
     Object.entries(conteoRecursos).forEach(([recurso, cantidad]) => {
@@ -330,7 +375,8 @@ function actualizarReportes() {
   if (reporteTurnos) {
     const conteoTurnos = {
       matutino: reservasActivas.filter((r) => r.turno === "matutino").length,
-      vespertino: reservasActivas.filter((r) => r.turno === "vespertino").length
+      vespertino: reservasActivas.filter((r) => r.turno === "vespertino")
+        .length,
     };
 
     reporteTurnos.innerHTML = "";
@@ -339,7 +385,9 @@ function actualizarReportes() {
       div.className = "reserva-item";
       div.innerHTML = `
         <div class="reserva-info">
-          <div class="reserva-recurso">Turno ${turno.charAt(0).toUpperCase() + turno.slice(1)}</div>
+          <div class="reserva-recurso">Turno ${
+            turno.charAt(0).toUpperCase() + turno.slice(1)
+          }</div>
           <div class="reserva-detalles">${cantidad} reservas activas</div>
         </div>
       `;
@@ -351,7 +399,9 @@ function actualizarReportes() {
 // ===== Tabs (sin depender de "event") =====
 function cambiarTab(tabName) {
   // Contenidos
-  document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+  document
+    .querySelectorAll(".tab-content")
+    .forEach((c) => c.classList.remove("active"));
   const target = document.getElementById(`tab-${tabName}`);
   if (target) target.classList.add("active");
 
