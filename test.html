@@ -1,45 +1,15 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Test de Reserva Automática</title>
-</head>
-<body>
-  <h2>🔁 Test automático de reserva (sin formulario)</h2>
-  <button id="btnEnviar">📤 Enviar reserva de prueba</button>
-
-  <script>
-    const endpoint = "https://script.google.com/macros/s/AKfycbxZglN8LQP4UEuyyG4HekWkq4yolrEJARsrFRcXFiSzFaymYJfu-pBqwhngPH0YGZxd/exec";
-
-    document.getElementById("btnEnviar").addEventListener("click", () => {
-      const reservaDePrueba = {
-        id: Date.now(),
-        fecha: new Date().toISOString().split("T")[0],
-        turno: "matutino",
-        hora: "2da",
-        recurso: "Proyector",
-        nombre: "Elizabeth",
-        apellido: "Tester",
-        fechaReserva: new Date().toISOString()
-      };
-
-      const payload = new URLSearchParams({ data: JSON.stringify(reservaDePrueba) });
-
-      fetch(endpoint, {
-        method: "POST",
-        body: payload
-      })
-      .then(res => res.text())
-      .then(respuesta => {
-        alert("✅ Respuesta del servidor:\n\n" + respuesta);
-        console.log("Respuesta cruda:", respuesta);
-      })
-      .catch(err => {
-        alert("❌ Error al conectar con el servidor:\n\n" + err.message);
-        console.error("Fetch error:", err);
-      });
-    });
-  </script>
-</body>
+<html>
+  <head>
+    <title>Test</title>
+  </head>
+  <body>
+    <button onclick="test()">Test</button>
+    <p id="result"></p>
+    <script>
+      function test() {
+        alert("Funciona");
+      }
+    </script>
+  </body>
 </html>
-

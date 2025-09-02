@@ -59,7 +59,7 @@ function actualizarReservas() {
 
   if (reservasActivas.length === 0) {
     container.innerHTML =
-      '<div class="alert alert-warning">📭 No tenés reservas activas</div>';
+      '<div class="alert alert-warning">🔭 No tenés reservas activas</div>';
     return;
   }
 
@@ -193,6 +193,7 @@ function consultarDisponibilidad() {
   });
 }
 
+// ⭐ FUNCIÓN PRINCIPAL DE RESERVA (CORREGIDA)
 function realizarReserva(fecha, turno, hora, recurso) {
   const nombre = document.getElementById("nombre").value.trim();
   const apellido = document.getElementById("apellido").value.trim();
@@ -219,205 +220,60 @@ function realizarReserva(fecha, turno, hora, recurso) {
     fechaReserva: new Date().toISOString(),
   };
 
-  // Guardar en LocalStorage (opcional)
+  // Guardar localmente primero
   reservas.push(nuevaReserva);
   localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
 
-  // Enviar a Google Sheets
-  const endpoint =
-    "https://script.google.com/macros/s/AKfycbxZglN8LQP4UEuyyG4HekWkq4yolrEJARsrFRcXFiSzFaymYJfu-pBqwhngPH0YGZxd/exec";
+  // Enviar a Google Sheets usando FormData (CORRECTO)
+  const endpoint = "https://script.google.com/macros/s/AKfycbxZglN8LQP4UEuyyG4HekWkq4yolrEJARsrFRcXFiSzFaymYJfu-pBqwhngPH0YGZxd/exec";
   
+  const formData = new URLSearchParams();
+  formData.append('data', JSON.stringify(nuevaReserva));
+
+  console.log("📤 Enviando datos:", JSON.stringify(nuevaReserva));
 
   fetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(nuevaReserva), // ⬅️ NO envolvemos en { data: ... }, se envía el JSON directo
+    body: formData
   })
-    .then((res) => res.json())
+    .then((res) => res.text())
     .then((data) => {
-      if (data.status === "success") {
-        alert(
-          `✅ Reserva realizada exitosamente!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}`
-        );
-        consultarDisponibilidad();
-        actualizarReservas();
-        actualizarReportes();
-      } else {
-        alert("❌ Error al guardar en la hoja: " + data.message);
-        console.error(data);
+      console.log("📥 Respuesta del servidor:", data);
+      
+      try {
+        const jsonResponse = JSON.parse(data);
+        if (jsonResponse.status === "success") {
+          alert(
+            `✅ Reserva realizada exitosamente!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}`
+          );
+        } else {
+          alert("❌ Error al guardar en la hoja: " + jsonResponse.message);
+        }
+      } catch (parseError) {
+        // Si no es JSON válido, pero la respuesta contiene "success"
+        if (data.includes("success") || data.includes("exitosa")) {
+          alert(
+            `✅ Reserva enviada exitosamente!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}`
+          );
+        } else {
+          alert("⚠️ Respuesta del servidor: " + data);
+        }
       }
+      
+      // Actualizar interfaz
+      consultarDisponibilidad();
+      actualizarReservas();
+      actualizarReportes();
     })
     .catch((error) => {
-      alert("❌ Error de conexión con el servidor.");
-      console.error("Error en fetch:", error);
+      console.error("❌ Error en fetch:", error);
+      alert("❌ Error de conexión con el servidor. La reserva se guardó localmente.");
+      
+      // Actualizar interfaz aunque haya error de conexión
+      consultarDisponibilidad();
+      actualizarReservas();
+      actualizarReportes();
     });
-}
-
-
-function enviarAGoogleSheets(
-  url,
-  nuevaReserva,
-  nombre,
-  apellido,
-  recurso,
-  fecha,
-  turno,
-  hora
-) {
-  // Crear un iframe invisible
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.name = "reserva-frame-" + Date.now();
-  document.body.appendChild(iframe);
-
-  // Crear formulario
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = url;
-  form.target = iframe.name;
-
-  // Agregar datos como campo oculto
-  const dataInput = document.createElement("input");
-  dataInput.type = "hidden";
-  dataInput.name = "data";
-  dataInput.value = JSON.stringify(nuevaReserva);
-  form.appendChild(dataInput);
-
-  // Agregar formulario al DOM temporalmente
-  document.body.appendChild(form);
-
-  // Manejar respuesta
-  let responseHandled = false;
-
-  iframe.onload = function () {
-    if (!responseHandled) {
-      responseHandled = true;
-
-      setTimeout(() => {
-        try {
-          // Limpiar elementos
-          document.body.removeChild(form);
-          document.body.removeChild(iframe);
-        } catch (e) {
-          console.log("Error limpiando elementos (normal)");
-        }
-
-        // Mostrar mensaje de éxito
-        alert(
-          `✅ ¡Reserva guardada en Google Sheets!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}\n\n🔍 Revisa tu Google Sheet para confirmar.`
-        );
-
-        // Actualizar interfaz
-        consultarDisponibilidad();
-        actualizarReservas();
-        actualizarReportes();
-      }, 2000); // Dar tiempo para que se procese
-    }
-  };
-
-  // Manejar errores de carga
-  iframe.onerror = function () {
-    if (!responseHandled) {
-      responseHandled = true;
-      alert(
-        "⚠️ Error al conectar con Google Sheets. La reserva se guardó localmente."
-      );
-
-      try {
-        document.body.removeChild(form);
-        document.body.removeChild(iframe);
-      } catch (e) {}
-    }
-  };
-
-  // Enviar formulario
-  console.log("Enviando reserva a Google Sheets...");
-  form.submit();
-}
-
-function enviarPorForm(
-  url,
-  nuevaReserva,
-  nombre,
-  apellido,
-  recurso,
-  fecha,
-  turno,
-  hora
-) {
-  // Crear un iframe invisible para enviar los datos
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.name = "reserva-frame";
-  document.body.appendChild(iframe);
-
-  // Crear form que se envía al iframe
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = url;
-  form.target = "reserva-frame";
-
-  // Agregar el campo de datos
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = "data";
-  input.value = JSON.stringify(nuevaReserva);
-  form.appendChild(input);
-
-  document.body.appendChild(form);
-
-  // Manejar la respuesta del iframe
-  iframe.onload = function () {
-    setTimeout(() => {
-      try {
-        // Limpiar elementos
-        document.body.removeChild(form);
-        document.body.removeChild(iframe);
-
-        // Mostrar mensaje de éxito
-        alert(
-          `✅ Reserva realizada exitosamente!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}`
-        );
-
-        // Actualizar interfaz
-        consultarDisponibilidad();
-        actualizarReservas();
-        actualizarReportes();
-      } catch (error) {
-        console.log("Reserva enviada, posible éxito");
-        alert(
-          `✅ Reserva enviada a Google Sheets!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}`
-        );
-      }
-    }, 1000);
-  };
-
-  // Enviar el form
-  form.submit();
-}
-
-// Función alternativa usando JSONP (si la anterior no funciona)
-function enviarPorJSONP(url, data, callback) {
-  const callbackName = "jsonp_callback_" + Math.round(100000 * Math.random());
-
-  // Crear función de callback global
-  window[callbackName] = function (response) {
-    delete window[callbackName];
-    document.body.removeChild(script);
-    callback(response);
-  };
-
-  // Crear script tag para JSONP
-  const script = document.createElement("script");
-  script.src =
-    url +
-    "?callback=" +
-    callbackName +
-    "&data=" +
-    encodeURIComponent(JSON.stringify(data));
-  document.body.appendChild(script);
 }
 
 function cancelarReserva(id) {
@@ -437,69 +293,6 @@ function cancelarReserva(id) {
     consultarDisponibilidad();
   }
 }
-
-function realizarReserva(fecha, turno, hora, recurso) {
-  const nombre = document.getElementById("nombre").value.trim();
-  const apellido = document.getElementById("apellido").value.trim();
-
-  if (!nombre || !apellido) {
-    alert("⚠️ Por favor ingresá nombre y apellido ");
-    return;
-  }
-
-  const confirmacion = confirm(
-    `¿Confirmás la reserva de ${recurso} para el ${fecha} en el turno ${turno}, hora ${hora}, a nombre de ${nombre} ${apellido}?`
-  );
-
-  if (!confirmacion) return;
-
-  const nuevaReserva = {
-    id: Date.now(),
-    fecha: fecha,
-    turno: turno,
-    hora: hora,
-    recurso: recurso,
-    nombre: nombre,
-    apellido: apellido,
-    fechaReserva: new Date().toISOString(),
-  };
-
-  // Guardar localmente (opcional)
-  reservas.push(nuevaReserva);
-  localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
-
-  // Enviar a Google Sheets
-  const endpoint =
-    "https://script.google.com/macros/s/AKfycbxZglN8LQP4UEuyyG4HekWkq4yolrEJARsrFRcXFiSzFaymYJfu-pBqwhngPH0YGZxd/exec";
-
-  fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    // 👇 ¡IMPORTANTE! El Apps Script espera el objeto dentro de "data", y como STRING
-    body: JSON.stringify({ data: JSON.stringify(nuevaReserva) }),
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.status === "success") {
-        alert(
-          `✅ Reserva realizada exitosamente!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Hora: ${hora}`
-        );
-        consultarDisponibilidad();
-        actualizarReservas();
-        actualizarReportes();
-      } else {
-        alert("❌ Error al guardar en la hoja: " + data.message);
-        console.error(data);
-      }
-    })
-    .catch((error) => {
-      alert("❌ Error de conexión con el servidor.");
-      console.error("Error en fetch:", error);
-    });
-}
-
 
 function actualizarReportes() {
   const reservasActivas = reservas.filter(
@@ -653,4 +446,8 @@ setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
 // Ejecutar limpieza al cargar
 limpiarReservasVencidas();
 
-
+// Función de prueba para debugging
+function debugReserva() {
+  console.log("Reservas actuales:", reservas);
+  console.log("Fecha actual:", new Date().toISOString().split("T")[0]);
+}
