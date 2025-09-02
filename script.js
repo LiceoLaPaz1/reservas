@@ -125,6 +125,13 @@ function consultarDisponibilidad() {
     return;
   }
 
+  const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
+  const indiceHora = horasTurno.indexOf(hora);
+  if (indiceHora === -1) {
+    alert("⚠️ Hora inválida");
+    return;
+  }
+
   const mensajeInicial = document.getElementById("mensaje-inicial");
   const infoConsulta = document.getElementById("info-consulta");
   const recursosContainer = document.getElementById("recursos-container");
@@ -149,8 +156,6 @@ function consultarDisponibilidad() {
     `;
   }
 
-  const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
-  const indiceHora = horasTurno.indexOf(hora);
   const horasSeleccionadas = horasTurno.slice(indiceHora, indiceHora + duracion);
 
   const recursos = turno === "matutino" ? recursosMatutino : recursosVespertino;
@@ -361,43 +366,32 @@ function cambiarTab(tabName) {
   if (tabName === "reportes") actualizarReportes();
 }
 
-// ===== Limpiar selección =====
-function limpiarSeleccion() {
-  const turnoEl = document.getElementById("turno");
-  const horaEl = document.getElementById("hora");
-  const durEl = document.getElementById("duracion");
-  const info = document.getElementById("info-consulta");
-  const recCont = document.getElementById("recursos-container");
-  const msg = document.getElementById("mensaje-inicial");
-
-  if (turnoEl) turnoEl.value = "";
-  if (horaEl) horaEl.innerHTML = '<option value="">Seleccionar hora</option>';
-  if (durEl) durEl.value = 1;
-  if (info) info.style.display = "none";
-  if (recCont) recCont.style.display = "none";
-  if (msg) msg.style.display = "block";
+// ===== Vencimiento de reservas =====
+// Convierte etiquetas "1era", "2da", "3era", "4ta", "5ta", "6ta", "7ma", "8va" y "0" a índice 0..8
+function labelAHoraIndice(label) {
+  if (label === "0") return 0;
+  const m = (label || "").match(/\d+/);
+  return m ? parseInt(m[0], 10) : NaN;
 }
 
-// ===== Vencimiento de reservas =====
 function esPasado(fecha, hora, turno) {
   const ahora = new Date();
   const fechaReserva = new Date(fecha + "T00:00:00");
 
+  // Si la fecha es anterior a hoy
   if (fechaReserva < new Date(ahora.toDateString())) return true;
 
+  // Si es hoy, comparar horas reales
   if (fechaReserva.toDateString() === ahora.toDateString()) {
-    const horaActual = ahora.getHours();
-    let horaReserva;
+    const idx = labelAHoraIndice(hora); // 0..8
+    if (!Number.isFinite(idx)) return false; // formato desconocido -> no marcar como pasado
 
-    if (hora === "0") {
-      horaReserva = 13; // 13:00
-    } else if (hora.includes("era")) {
-      const numeroHora = parseInt(hora, 10);
-      horaReserva = turno === "matutino" ? 7 + numeroHora : 13 + numeroHora;
-    } else {
-      // Respaldo por si aparece un formato inesperado
-      horaReserva = 23;
-    }
+    // Mapeo simple a hora real (aprox):
+    // Matutino: 1era->08:00 (idx=1 => 7+1), 8va->15:00, etc.
+    // Vespertino: 0->13:00, 1era->14:00, etc.
+    let horaReserva = turno === "matutino" ? 7 + idx : 13 + idx;
+
+    const horaActual = ahora.getHours();
     return horaActual > horaReserva;
   }
   return false;
