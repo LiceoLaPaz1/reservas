@@ -41,41 +41,29 @@ const horasVespertino = [
   "7ma",
 ];
 
-// ===== Almacenamiento de reservas (localStorage) =====
+// ===== Estado =====
 let reservas = [];
-try {
-  reservas = JSON.parse(localStorage.getItem("reservasLiceo")) || [];
-} catch {
-  reservas = [];
-}
+let reservaEnProgreso = false;
 
-// ===== Utilidad segura para leer duración =====
+// ===== Helpers generales =====
 function getDuracion() {
   const el = document.getElementById("duracion");
   const n = el ? parseInt(el.value, 10) : 1;
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-// ===== Inicialización =====
-document.addEventListener("DOMContentLoaded", function () {
-  const hoy = new Date().toISOString().split("T")[0];
-  const fechaEl = document.getElementById("fecha");
-  if (fechaEl) fechaEl.value = hoy;
-
-  actualizarReservas();
-  actualizarReportes();
-  limpiarReservasVencidas();
-});
-
-// ===== Helpers =====
+function slotKey({ fecha, turno, hora, recurso }) {
+  return `${fecha}|${turno}|${hora}|${recurso}`;
+}
+function buildKey(fecha, turno, hora, recurso) {
+  return `${fecha}|${turno}|${hora}|${recurso}`;
+}
 
 // Conjunto de reservas activas (clave: fecha|turno|hora|recurso)
 function buildReservasActivasSet() {
   const s = new Set();
   reservas.forEach((r) => {
-    if (!esPasado(r.fecha)) {
-      s.add(`${r.fecha}|${r.turno}|${r.hora}|${r.recurso}`);
-    }
+    if (!esPasado(r.fecha)) s.add(slotKey(r));
   });
   return s;
 }
@@ -84,6 +72,23 @@ function buildReservasActivasSet() {
 function getTodosLosRecursos() {
   return Array.from(new Set([...recursosMatutino, ...recursosVespertino]));
 }
+
+// ===== Inicialización =====
+try {
+  reservas = JSON.parse(localStorage.getItem("reservasLiceo")) || [];
+} catch {
+  reservas = [];
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const hoy = new Date().toISOString().split("T")[0];
+  const fechaEl = document.getElementById("fecha");
+  if (fechaEl) fechaEl.value = hoy;
+
+  actualizarReservas();
+  actualizarReportes();
+  limpiarReservasVencidas();
+});
 
 // ===== Listado de reservas activas =====
 function actualizarReservas() {
@@ -99,7 +104,6 @@ function actualizarReservas() {
   }
 
   container.innerHTML = "";
-
   reservasActivas.forEach((reserva) => {
     const fechaFormatted = new Date(
       reserva.fecha + "T00:00:00"
@@ -120,7 +124,7 @@ function actualizarReservas() {
   });
 }
 
-// ===== Rellenar horas según turno =====
+// ===== Selección de horas según turno =====
 function actualizarHoras() {
   const turno = document.getElementById("turno").value;
   const horaSelect = document.getElementById("hora");
@@ -158,7 +162,7 @@ function consultarDisponibilidad() {
   const duracion = getDuracion();
 
   if (!fecha || !turno || !hora) {
-    alert("⚠️ Por favor selecciona fecha, turno y hora");
+    alert("⚠️ Por favor seleccioná fecha, turno y hora");
     return;
   }
 
@@ -212,9 +216,8 @@ function consultarDisponibilidad() {
   const R = buildReservasActivasSet();
 
   recursos.forEach((recurso) => {
-    // Ocupado si alguna hora seleccionada está reservada
     const ocupado = horasSeleccionadas.some((hSel) =>
-      R.has(`${fecha}|${turno}|${hSel}|${recurso}`)
+      R.has(buildKey(fecha, turno, hSel, recurso))
     );
 
     const card = document.createElement("div");
@@ -233,104 +236,109 @@ function consultarDisponibilidad() {
   });
 }
 
-// ===== Reserva multi-hora =====
-function realizarReserva(fecha, turno, hora, recurso) {
-  const nombre = document.getElementById("nombre").value.trim();
-  const apellido = document.getElementById("apellido").value.trim();
-  const duracion = getDuracion();
+// ===== Reserva multi-hora (con bloqueo de doble-reserva) =====
+async function realizarReserva(fecha, turno, hora, recurso) {
+  if (reservaEnProgreso) return; // evita doble click
+  reservaEnProgreso = true;
 
-  if (!nombre || !apellido) {
-    alert("⚠️ Por favor ingresá nombre y apellido");
-    return;
+  try {
+    const nombre = document.getElementById("nombre").value.trim();
+    const apellido = document.getElementById("apellido").value.trim();
+    const duracion = getDuracion();
+
+    if (!nombre || !apellido) {
+      alert("⚠️ Por favor ingresá nombre y apellido");
+      return;
+    }
+
+    const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
+    const indiceHora = horasTurno.indexOf(hora);
+
+    if (indiceHora === -1) {
+      alert("⚠️ Hora inválida");
+      return;
+    }
+    if (indiceHora + duracion > horasTurno.length) {
+      alert("⚠️ No hay suficientes horas disponibles en este turno.");
+      return;
+    }
+
+    const horasSeleccionadas = horasTurno.slice(
+      indiceHora,
+      indiceHora + duracion
+    );
+
+    // ===== Chequeo local anti-duplicado =====
+    const R = buildReservasActivasSet();
+    const conflictoLocal = horasSeleccionadas.some((hSel) =>
+      R.has(buildKey(fecha, turno, hSel, recurso))
+    );
+    if (conflictoLocal) {
+      alert("❌ Esa franja ya está reservada.");
+      return;
+    }
+
+    const confirmacion = confirm(
+      `¿Confirmás la reserva de ${recurso} para el ${fecha}, turno ${turno}, desde la hora ${hora} por ${duracion} hora(s), a nombre de ${nombre} ${apellido}?`
+    );
+    if (!confirmacion) return;
+
+    const endpoint =
+      new URLSearchParams(location.search).get("api") ||
+      "https://script.google.com/macros/s/AKfycbwfQdx0QdsB6zZW6AhE3793Tc0Qu4y0-2eSTcGP9Uj6SkRTiaQ6yFk7Xp5Qze8gp-CZ/exec";
+
+    // Crear y enviar una fila por cada hora seleccionada
+    horasSeleccionadas.forEach((h, i) => {
+      const nuevaReserva = {
+        id: Date.now() + i + Math.floor(Math.random() * 1000),
+        fecha: fecha,
+        turno: turno,
+        hora: h,
+        recurso: recurso,
+        nombre: nombre,
+        apellido: apellido,
+        cantidadHoras: duracion, // para la hoja (columna H)
+        fechaReserva: new Date().toISOString(),
+      };
+
+      // Guardar localmente primero para que la UI se pinte en rojo al instante
+      reservas.push(nuevaReserva);
+
+      const formData = new URLSearchParams();
+      formData.append("data", JSON.stringify(nuevaReserva));
+      // formData.append("debug", "1"); // <- activar si querés ver columnas en respuesta
+
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData,
+      })
+        .then((res) => res.text())
+        .then((data) => console.log("📥 Respuesta del servidor:", data))
+        .catch((error) => console.error("❌ Error en fetch:", error));
+    });
+
+    localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
+
+    alert(
+      `✅ Reserva realizada!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Horas: ${horasSeleccionadas.join(
+        ", "
+      )}`
+    );
+
+    // Refrescar UI y reportes
+    consultarDisponibilidad();
+    actualizarReservas();
+    actualizarReportes();
+  } finally {
+    reservaEnProgreso = false;
   }
-
-  const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
-  const indiceHora = horasTurno.indexOf(hora);
-
-  if (indiceHora === -1) {
-    alert("⚠️ Hora inválida");
-    return;
-  }
-
-  if (indiceHora + duracion > horasTurno.length) {
-    alert("⚠️ No hay suficientes horas disponibles en este turno.");
-    return;
-  }
-
-  const horasSeleccionadas = horasTurno.slice(
-    indiceHora,
-    indiceHora + duracion
-  );
-
-  const conflicto = reservas.some(
-    (reserva) =>
-      reserva.fecha === fecha &&
-      reserva.turno === turno &&
-      horasSeleccionadas.includes(reserva.hora) &&
-      reserva.recurso === recurso &&
-      !esPasado(reserva.fecha)
-  );
-  if (conflicto) {
-    alert("❌ Alguna de las horas seleccionadas ya está reservada.");
-    return;
-  }
-
-  const confirmacion = confirm(
-    `¿Confirmás la reserva de ${recurso} para el ${fecha}, turno ${turno}, desde la hora ${hora} por ${duracion} hora(s), a nombre de ${nombre} ${apellido}?`
-  );
-  if (!confirmacion) return;
-
-  const endpoint =
-    "https://script.google.com/macros/s/AKfycbwfQdx0QdsB6zZW6AhE3793Tc0Qu4y0-2eSTcGP9Uj6SkRTiaQ6yFk7Xp5Qze8gp-CZ/exec";
-
-  // Crear y enviar una fila por cada hora seleccionada
-  horasSeleccionadas.forEach((h, i) => {
-    const nuevaReserva = {
-      id: Date.now() + i + Math.floor(Math.random() * 1000),
-      fecha: fecha,
-      turno: turno,
-      hora: h,
-      recurso: recurso,
-      nombre: nombre,
-      apellido: apellido,
-      cantidadHoras: duracion, // <--- NUEVO CAMPO para la hoja
-      fechaReserva: new Date().toISOString(),
-    };
-
-    // Guardar localmente primero para que la UI se pinte en rojo al instante
-    reservas.push(nuevaReserva);
-
-    const formData = new URLSearchParams();
-    formData.append("data", JSON.stringify(nuevaReserva));
-
-    fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData,
-    })
-      .then((res) => res.text())
-      .then((data) => console.log("📥 Respuesta del servidor:", data))
-      .catch((error) => console.error("❌ Error en fetch:", error));
-  });
-
-  localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
-
-  alert(
-    `✅ Reserva realizada!\n\n📋 Detalles:\n• Docente: ${nombre} ${apellido}\n• Recurso: ${recurso}\n• Fecha: ${fecha}\n• Turno: ${turno}\n• Horas: ${horasSeleccionadas.join(
-      ", "
-    )}`
-  );
-
-  // Refrescar UI y reportes
-  consultarDisponibilidad();
-  actualizarReservas();
-  actualizarReportes();
 }
 
 // ===== Cancelar reserva =====
 function cancelarReserva(id) {
   const confirmacion = confirm(
-    "¿Estás seguro de que quieres cancelar esta reserva?"
+    "¿Estás seguro de que querés cancelar esta reserva?"
   );
   if (!confirmacion) return;
 
@@ -411,16 +419,14 @@ function actualizarReportes() {
   }
 }
 
-// ===== Tabs (sin depender de "event") =====
+// ===== Tabs =====
 function cambiarTab(tabName) {
-  // Contenidos
   document
     .querySelectorAll(".tab-content")
     .forEach((c) => c.classList.remove("active"));
   const target = document.getElementById(`tab-${tabName}`);
   if (target) target.classList.add("active");
 
-  // Cabeceras
   const tabs = document.querySelectorAll(".tabs .tab");
   tabs.forEach((t) => t.classList.remove("active"));
   const indexByName = { disponibilidad: 0, reservas: 1, reportes: 2 };
@@ -432,8 +438,7 @@ function cambiarTab(tabName) {
 }
 
 // ===== Vencimiento de reservas =====
-// Simplificado: solo se consideran "pasadas" si la fecha es anterior a hoy.
-// (Así, durante el día actual se ven como activas y pintan en rojo.)
+// Simplificado: una reserva es "pasada" sólo si la fecha es anterior a hoy.
 function esPasado(fecha) {
   const hoyStr = new Date().toISOString().split("T")[0];
   if (fecha < hoyStr) return true;
@@ -449,6 +454,30 @@ function limpiarReservasVencidas() {
   }
 }
 setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
+
+// ===== Limpiar selección (arreglado) =====
+function limpiarSeleccion() {
+  const turnoEl = document.getElementById("turno");
+  const horaEl = document.getElementById("hora");
+  const durEl = document.getElementById("duracion");
+  const info = document.getElementById("info-consulta");
+  const recCont = document.getElementById("recursos-container");
+  const msg = document.getElementById("mensaje-inicial");
+  const detalles = document.getElementById("detalles-consulta");
+  const grid = document.getElementById("recursos-grid");
+
+  if (turnoEl) turnoEl.value = "";
+  if (horaEl) {
+    horaEl.innerHTML = '<option value="">Seleccionar hora</option>';
+    // horaEl.disabled = true; // si querés deshabilitar hasta elegir turno
+  }
+  if (durEl) durEl.value = 1;
+  if (info) info.style.display = "none";
+  if (recCont) recCont.style.display = "none";
+  if (msg) msg.style.display = "block";
+  if (detalles) detalles.innerHTML = "";
+  if (grid) grid.innerHTML = "";
+}
 
 // ===== Debug =====
 function debugReserva() {
