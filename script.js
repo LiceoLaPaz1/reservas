@@ -1,37 +1,30 @@
-/************************************************************
- * Reserva de recursos - Frontend con prevención de colisiones
- * - Verificación atómica en servidor
- * - Sistema de locks distribuidos
- * - Retry automático en caso de conflictos
- ************************************************************/
+// Sistema de Reservas - Versión compatible con servidor actual
+// Prevención básica de colisiones + sincronización mejorada
 
-/* =================== Configuración =================== */
-
-const endpoint =
-  new URLSearchParams(location.search).get("api") ||
+// Configuración
+const endpoint = new URLSearchParams(location.search).get("api") || 
   "https://script.google.com/macros/s/AKfycbwfQdx0QdsB6zZW6AhE3793Tc0Qu4y0-2eSTcGP9Uj6SkRTiaQ6yFk7Xp5Qze8gp-CZ/exec";
 
 // Recursos por turno
 const recursosMatutino = [
-  "Cañón", "TV Planta Baja", "TV Planta Alta", 'TV 43"', 'Caja TV 50"', "Caja TV 43"
+  "Cañón", "TV Planta Baja", "TV Planta Alta", "TV 43\"", "Caja TV 50\"", "Caja TV 43"
 ];
 
 const recursosVespertino = [
-  "Cañón", "TV Planta Baja", "TV Planta Alta", 'TV 43"', 'Caja TV 50"', "Caja TV 43",
+  "Cañón", "TV Planta Baja", "TV Planta Alta", "TV 43\"", "Caja TV 50\"", "Caja TV 43",
   "Sala de Informática", "Salón 10"
 ];
 
 const horasMatutino = ["1era", "2da", "3era", "4ta", "5ta", "6ta", "7ma", "8va"];
 const horasVespertino = ["0", "1era", "2da", "3era", "4ta", "5ta", "6ta", "7ma"];
 
-/* =================== Estado =================== */
-
+// Estado global
 let reservas = [];
 let reservaEnProgreso = false;
 let ultimaSincronizacion = 0;
 let sessionId = generateSessionId();
 
-// Cache local como fallback
+// Cargar cache local
 try {
   const cached = JSON.parse(localStorage.getItem("reservasLiceo")) || [];
   reservas = cached;
@@ -40,10 +33,9 @@ try {
   reservas = [];
 }
 
-/* =================== Utilidades =================== */
-
+// Utilidades
 function generateSessionId() {
-  return Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  return Date.now() + "_" + Math.random().toString(36).substr(2, 9);
 }
 
 function getDuracion() {
@@ -53,11 +45,11 @@ function getDuracion() {
 }
 
 function slotKey(reserva) {
-  return `${reserva.fecha}|${reserva.turno}|${reserva.hora}|${reserva.recurso}`;
+  return reserva.fecha + "|" + reserva.turno + "|" + reserva.hora + "|" + reserva.recurso;
 }
 
 function buildKey(fecha, turno, hora, recurso) {
-  return `${fecha}|${turno}|${hora}|${recurso}`;
+  return fecha + "|" + turno + "|" + hora + "|" + recurso;
 }
 
 function esPasado(fecha) {
@@ -66,86 +58,20 @@ function esPasado(fecha) {
 }
 
 function getTodosLosRecursos() {
-  return Array.from(new Set([...recursosMatutino, ...recursosVespertino]));
+  return Array.from(new Set([].concat(recursosMatutino, recursosVespertino)));
 }
 
-/* =================== UI para estado de reserva =================== */
-
-function mostrarEstadoReserva(mensaje, tipo) {
-  let container = document.getElementById("estado-reserva");
-  
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "estado-reserva";
-    document.body.appendChild(container);
-  }
-
-  const colores = {
-    info: "estado-info",
-    success: "estado-success", 
-    warning: "estado-warning",
-    error: "estado-error"
-  };
-
-  // Limpiar clases anteriores
-  container.className = "";
-  container.classList.add(colores[tipo] || "estado-info");
-  
-  container.textContent = mensaje;
-  container.classList.add("show");
-}
-
-function limpiarEstadoReserva() {
-  const container = document.getElementById("estado-reserva");
-  if (container) {
-    container.classList.remove("show");
-  }
-}
-
-/* =================== Indicador de estado de conexión =================== */
-
-function actualizarEstadoConexion(estado, mensaje) {
-  let indicator = document.getElementById("conexion-status");
-  
-  if (!indicator) {
-    indicator = document.createElement("div");
-    indicator.id = "conexion-status";
-    indicator.className = "conexion-status";
-    document.body.appendChild(indicator);
-  }
-  
-  // Limpiar clases anteriores
-  indicator.className = "conexion-status";
-  
-  switch (estado) {
-    case "online":
-      indicator.classList.add("conexion-online");
-      indicator.textContent = "🟢 " + (mensaje || "Conectado");
-      break;
-    case "offline":
-      indicator.classList.add("conexion-offline");
-      indicator.textContent = "🔴 " + (mensaje || "Sin conexión");
-      break;
-    case "sincronizando":
-      indicator.classList.add("conexion-sincronizando");
-      indicator.textContent = "🔄 " + (mensaje || "Sincronizando...");
-      break;
-  }
-}
-
-/* =================== Sincronización con retry =================== */
-
-async function sincronizarConServidor(maxRetries = 3) {
-  actualizarEstadoConexion("sincronizando", "Sincronizando con servidor...");
+// Sincronización mejorada con manejo de errores
+async function sincronizarConServidor(maxRetries) {
+  if (!maxRetries) maxRetries = 3;
   
   for (let intento = 0; intento < maxRetries; intento++) {
     try {
       const url = new URL(endpoint);
       url.searchParams.set("action", "getAll");
-      url.searchParams.set("session", sessionId);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const timeoutId = setTimeout(function() { controller.abort(); }, 10000);
       
       const response = await fetch(url.toString(), {
         signal: controller.signal
@@ -157,14 +83,28 @@ async function sincronizarConServidor(maxRetries = 3) {
         throw new Error("HTTP " + response.status);
       }
       
-      const data = await response.json();
+      // Intentar parsear como JSON, si falla, asumir que es texto
+      let data;
+      const responseText = await response.text();
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.warn("Respuesta no es JSON válido:", responseText);
+        // Si no es JSON, asumir que la conexión funciona pero no hay datos
+        return true;
+      }
       
       if (data.status === "ok" && Array.isArray(data.reservas)) {
-        reservas = data.reservas.filter(r => !esPasado(r.fecha));
+        reservas = data.reservas.filter(function(r) { return !esPasado(r.fecha); });
         localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
         ultimaSincronizacion = Date.now();
-        
-        actualizarEstadoConexion("online", "Última sync: " + new Date().toLocaleTimeString());
+        return true;
+      } else if (data.status === "ok") {
+        // Respuesta OK pero sin reservas array, asumir lista vacía
+        reservas = [];
+        localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
+        ultimaSincronizacion = Date.now();
         return true;
       } else {
         throw new Error(data.message || "Respuesta inválida del servidor");
@@ -172,76 +112,149 @@ async function sincronizarConServidor(maxRetries = 3) {
     } catch (error) {
       console.warn("Intento " + (intento + 1) + " falló:", error);
       if (intento < maxRetries - 1) {
-        actualizarEstadoConexion("sincronizando", "Reintentando... (" + (intento + 2) + "/" + maxRetries + ")");
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, intento) * 1000)); // Exponential backoff
+        await new Promise(function(resolve) { 
+          setTimeout(resolve, Math.pow(2, intento) * 1000); 
+        });
       }
     }
   }
   
-  actualizarEstadoConexion("offline", "Error de conexión");
+  console.warn("No se pudo sincronizar después de " + maxRetries + " intentos");
   return false;
 }
 
-/* =================== Sistema de locks distribuidos =================== */
+// Reserva simple con verificación previa
+async function realizarReserva(fecha, turno, hora, recurso) {
+  if (reservaEnProgreso) {
+    alert("Ya hay una reserva en progreso. Espera un momento.");
+    return;
+  }
 
-async function adquirirLockYVerificar(fecha, turno, recurso, horasSeleccionadas, lockId) {
+  reservaEnProgreso = true;
+
   try {
-    const formData = new URLSearchParams();
-    formData.append("action", "acquireLockAndCheck");
-    formData.append("fecha", fecha);
-    formData.append("turno", turno);
-    formData.append("recurso", recurso);
-    formData.append("horas", horasSeleccionadas.join(","));
-    formData.append("lockId", lockId);
-    formData.append("sessionId", sessionId);
-    formData.append("ttl", "30"); // Lock por 30 segundos
+    const nombre = document.getElementById("nombre").value.trim();
+    const apellido = document.getElementById("apellido").value.trim();
+    const duracion = getDuracion();
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    if (!nombre || !apellido) {
+      alert("Por favor ingresa nombre y apellido");
+      return;
+    }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData,
-      signal: controller.signal
+    const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
+    const indiceHora = horasTurno.indexOf(hora);
+    
+    if (indiceHora === -1) {
+      alert("Hora inválida");
+      return;
+    }
+    
+    if (indiceHora + duracion > horasTurno.length) {
+      alert("No hay suficientes horas disponibles en este turno.");
+      return;
+    }
+
+    const horasSeleccionadas = horasTurno.slice(indiceHora, indiceHora + duracion);
+
+    // Sincronizar antes de verificar
+    await sincronizarConServidor();
+
+    // Verificar disponibilidad local primero
+    const ocupado = horasSeleccionadas.some(function(hSel) {
+      return reservas.some(function(r) {
+        return !esPasado(r.fecha) && 
+               r.fecha === fecha && 
+               r.turno === turno && 
+               r.hora === hSel && 
+               r.recurso === recurso;
+      });
     });
 
-    clearTimeout(timeoutId);
-    const result = await response.json();
+    if (ocupado) {
+      alert("Este recurso ya está reservado en alguna de las horas seleccionadas.");
+      return;
+    }
 
-    return {
-      success: result.status === "success" && result.lockAcquired && result.disponible,
-      conflict: result.status === "conflict",
-      message: result.message
-    };
+    // Confirmar reserva
+    const confirmacion = confirm(
+      "¿Confirmar reserva?\n\n" +
+      "Docente: " + nombre + " " + apellido + "\n" +
+      "Recurso: " + recurso + "\n" +
+      "Fecha: " + fecha + "\n" +
+      "Turno: " + turno + "\n" +
+      "Horas: " + horasSeleccionadas.join(", ")
+    );
+
+    if (!confirmacion) return;
+
+    // Realizar reservas
+    let reservasExitosas = 0;
+    const nuevasReservas = [];
+
+    for (let i = 0; i < horasSeleccionadas.length; i++) {
+      const h = horasSeleccionadas[i];
+      
+      const nuevaReserva = {
+        id: Date.now() + i + Math.floor(Math.random() * 1000),
+        fecha: fecha,
+        turno: turno,
+        hora: h,
+        recurso: recurso,
+        nombre: nombre,
+        apellido: apellido,
+        cantidadHoras: duracion,
+        fechaReserva: new Date().toISOString()
+      };
+
+      const exito = await enviarReservaServidor(nuevaReserva);
+      if (exito) {
+        nuevasReservas.push(nuevaReserva);
+        reservasExitosas++;
+      } else {
+        console.warn("Fallo reserva para hora " + h + ", cancelando proceso");
+        break;
+      }
+    }
+
+    if (reservasExitosas === horasSeleccionadas.length) {
+      // Todas exitosas
+      reservas = reservas.concat(nuevasReservas);
+      localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
+      
+      alert(
+        "Reserva realizada exitosamente!\n\n" +
+        "Detalles:\n" +
+        "Docente: " + nombre + " " + apellido + "\n" +
+        "Recurso: " + recurso + "\n" +
+        "Fecha: " + fecha + "\n" +
+        "Turno: " + turno + "\n" +
+        "Horas: " + horasSeleccionadas.join(", ")
+      );
+    } else {
+      alert(
+        "Solo se pudieron reservar " + reservasExitosas + " de " + horasSeleccionadas.length + " horas.\n" +
+        "Algunas ya estaban ocupadas por otro docente."
+      );
+    }
+
+    // Sincronizar y refrescar
+    await sincronizarConServidor();
+    consultarDisponibilidadServidor();
+    actualizarReservas();
+    actualizarReportes();
 
   } catch (error) {
-    console.error("Error adquiriendo lock:", error);
-    return { success: false, conflict: false, message: error.message };
+    console.error("Error en reserva:", error);
+    alert("Error procesando la reserva. Intenta nuevamente.");
+  } finally {
+    reservaEnProgreso = false;
   }
 }
 
-async function liberarLock(lockId) {
+async function enviarReservaServidor(reservaData) {
   try {
     const formData = new URLSearchParams();
-    formData.append("action", "releaseLock");
-    formData.append("lockId", lockId);
-    formData.append("sessionId", sessionId);
-
-    await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData
-    });
-  } catch (error) {
-    console.warn("Error liberando lock:", error);
-  }
-}
-
-async function crearReservaIndividual(reservaData) {
-  try {
-    const formData = new URLSearchParams();
-    formData.append("action", "createReservation");
     formData.append("data", JSON.stringify(reservaData));
 
     const response = await fetch(endpoint, {
@@ -250,220 +263,32 @@ async function crearReservaIndividual(reservaData) {
       body: formData
     });
 
-    const result = await response.json();
-    return result.status === "success";
-
+    // Manejar respuesta que puede no ser JSON
+    const responseText = await response.text();
+    
+    try {
+      const result = JSON.parse(responseText);
+      return result.status === "success";
+    } catch (parseError) {
+      // Si no es JSON, verificar si contiene indicadores de éxito
+      const textoLower = responseText.toLowerCase();
+      if (textoLower.includes("success") || textoLower.includes("exitoso")) {
+        return true;
+      } else if (textoLower.includes("conflict") || textoLower.includes("ocupado")) {
+        console.warn("Conflicto detectado:", responseText);
+        return false;
+      } else {
+        console.error("Respuesta del servidor no reconocida:", responseText);
+        return false;
+      }
+    }
   } catch (error) {
-    console.error("Error creando reserva individual:", error);
+    console.error("Error enviando reserva:", error);
     return false;
   }
 }
 
-/* =================== Reserva atómica con sistema de locks =================== */
-
-async function realizarReservaAtomica(fecha, turno, hora, recurso) {
-  if (reservaEnProgreso) {
-    alert("⏳ Ya hay una reserva en progreso. Espera un momento.");
-    return;
-  }
-
-  reservaEnProgreso = true;
-  const lockId = "lock_" + sessionId + "_" + Date.now();
-
-  try {
-    const nombre = document.getElementById("nombre").value.trim();
-    const apellido = document.getElementById("apellido").value.trim();
-    const duracion = getDuracion();
-
-    if (!nombre || !apellido) {
-      alert("⚠️ Por favor ingresá nombre y apellido");
-      return;
-    }
-
-    const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
-    const indiceHora = horasTurno.indexOf(hora);
-    
-    if (indiceHora === -1) {
-      alert("⚠️ Hora inválida");
-      return;
-    }
-    
-    if (indiceHora + duracion > horasTurno.length) {
-      alert("⚠️ No hay suficientes horas disponibles en este turno.");
-      return;
-    }
-
-    const horasSeleccionadas = horasTurno.slice(indiceHora, indiceHora + duracion);
-
-    // Confirmar antes de proceder
-    const confirmacion = confirm(
-      "¿Confirmar reserva?\n\n" +
-      "👤 Docente: " + nombre + " " + apellido + "\n" +
-      "📚 Recurso: " + recurso + "\n" +
-      "📅 Fecha: " + fecha + "\n" +
-      "🕐 Turno: " + turno + "\n" +
-      "⏰ Horas: " + horasSeleccionadas.join(", ")
-    );
-
-    if (!confirmacion) return;
-
-    // Mostrar estado de procesamiento
-    mostrarEstadoReserva("🔄 Procesando reserva...", "info");
-
-    // Intentar reserva atómica con reintentos
-    const resultado = await reservarConReintentos({
-      fecha: fecha, 
-      turno: turno, 
-      recurso: recurso, 
-      horasSeleccionadas: horasSeleccionadas, 
-      nombre: nombre, 
-      apellido: apellido, 
-      duracion: duracion, 
-      lockId: lockId
-    });
-
-    if (resultado.exito) {
-      // Actualizar cache local con las nuevas reservas
-      reservas.push(...resultado.reservas);
-      localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
-      
-      mostrarEstadoReserva(
-        "✅ ¡Reserva exitosa!\n\n" +
-        "📋 Detalles:\n" +
-        "• Docente: " + nombre + " " + apellido + "\n" +
-        "• Recurso: " + recurso + "\n" +
-        "• Fecha: " + fecha + "\n" +
-        "• Turno: " + turno + "\n" +
-        "• Horas: " + horasSeleccionadas.join(", "),
-        "success"
-      );
-    } else {
-      mostrarEstadoReserva(
-        "⚠️ " + resultado.mensaje + "\n\n" +
-        "Algunas horas pueden haber sido reservadas por otro usuario.",
-        "warning"
-      );
-    }
-
-    // Sincronizar y refrescar UI
-    await sincronizarConServidor();
-    await consultarDisponibilidadServidor();
-    actualizarReservas();
-    actualizarReportes();
-
-  } catch (error) {
-    console.error("Error en reserva atómica:", error);
-    mostrarEstadoReserva(
-      "❌ Error procesando la reserva. Por favor intentá nuevamente.",
-      "error"
-    );
-  } finally {
-    reservaEnProgreso = false;
-    // Limpiar estado visual después de 5 segundos
-    setTimeout(() => limpiarEstadoReserva(), 5000);
-  }
-}
-
-async function reservarConReintentos(params, maxIntentos = 3) {
-  const { fecha, turno, recurso, horasSeleccionadas, nombre, apellido, duracion, lockId } = params;
-  
-  for (let intento = 0; intento < maxIntentos; intento++) {
-    try {
-      mostrarEstadoReserva("🔄 Intento " + (intento + 1) + "/" + maxIntentos + "...", "info");
-      
-      // Paso 1: Adquirir lock y verificar disponibilidad
-      const lockResult = await adquirirLockYVerificar(fecha, turno, recurso, horasSeleccionadas, lockId);
-      
-      if (!lockResult.success) {
-        if (lockResult.conflict) {
-          // Conflicto de reserva - no reintentar
-          return {
-            exito: false,
-            mensaje: "El recurso ya fue reservado por otro usuario durante este proceso"
-          };
-        } else {
-          // Error de comunicación - reintentar
-          if (intento < maxIntentos - 1) {
-            await new Promise(resolve => setTimeout(resolve, (intento + 1) * 1500));
-            continue;
-          } else {
-            return {
-              exito: false,
-              mensaje: "Error de comunicación con el servidor"
-            };
-          }
-        }
-      }
-
-      // Paso 2: Crear reservas mientras tenemos el lock
-      const reservasCreadas = [];
-      let horasExitosas = 0;
-
-      for (let i = 0; i < horasSeleccionadas.length; i++) {
-        const h = horasSeleccionadas[i];
-        
-        const nuevaReserva = {
-          id: Date.now() + i + Math.floor(Math.random() * 1000),
-          fecha: fecha,
-          turno: turno,
-          hora: h,
-          recurso: recurso,
-          nombre: nombre,
-          apellido: apellido,
-          cantidadHoras: duracion,
-          fechaReserva: new Date().toISOString(),
-          sessionId: sessionId,
-          lockId: lockId
-        };
-
-        const exito = await crearReservaIndividual(nuevaReserva);
-        if (exito) {
-          reservasCreadas.push(nuevaReserva);
-          horasExitosas++;
-        } else {
-          // Si falla una hora, parar el proceso
-          break;
-        }
-      }
-
-      // Paso 3: Liberar lock
-      await liberarLock(lockId);
-
-      // Evaluar resultado
-      if (horasExitosas === horasSeleccionadas.length) {
-        return {
-          exito: true,
-          reservas: reservasCreadas,
-          mensaje: "Todas las horas fueron reservadas exitosamente"
-        };
-      } else {
-        return {
-          exito: false,
-          reservas: reservasCreadas,
-          mensaje: "Solo se pudieron reservar " + horasExitosas + " de " + horasSeleccionadas.length + " horas"
-        };
-      }
-
-    } catch (error) {
-      console.error("Intento " + (intento + 1) + " falló:", error);
-      
-      // Asegurar liberación del lock en caso de error
-      await liberarLock(lockId);
-      
-      if (intento < maxIntentos - 1) {
-        await new Promise(resolve => setTimeout(resolve, (intento + 1) * 2000));
-      }
-    }
-  }
-
-  return {
-    exito: false,
-    mensaje: "No se pudo completar la reserva después de varios intentos"
-  };
-}
-
-/* =================== Consulta de disponibilidad =================== */
-
+// Consulta de disponibilidad
 async function consultarDisponibilidadServidor() {
   const fecha = document.getElementById("fecha").value;
   const turno = document.getElementById("turno").value;
@@ -480,7 +305,7 @@ async function consultarDisponibilidadServidor() {
     const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
     const indiceHora = horasTurno.indexOf(hora);
     if (indiceHora === -1) {
-      alert("⚠️ Hora inválida");
+      alert("Hora inválida");
       return;
     }
 
@@ -489,7 +314,7 @@ async function consultarDisponibilidadServidor() {
     
   } catch (error) {
     console.error("Error consultando disponibilidad:", error);
-    alert("❌ Error consultando disponibilidad. Intentá nuevamente.");
+    alert("Error consultando disponibilidad. Intenta nuevamente.");
   } finally {
     mostrarCargando(false);
   }
@@ -514,11 +339,11 @@ function actualizarUIConsulta(fecha, turno, hora, duracion, horasSeleccionadas) 
   const detalles = document.getElementById("detalles-consulta");
   if (detalles) {
     detalles.innerHTML = 
-      "<strong>📅 Fecha:</strong> " + fechaFormatted + "<br>" +
-      "<strong>🕐 Turno:</strong> " + (turno.charAt(0).toUpperCase() + turno.slice(1)) + "<br>" +
-      "<strong>⏰ Hora inicial:</strong> " + hora + "<br>" +
-      "<strong>⏳ Duración:</strong> " + duracion + " hora(s)<br>" +
-      "<strong>🔄 Última sync:</strong> " + new Date(ultimaSincronizacion).toLocaleTimeString();
+      "<strong>Fecha:</strong> " + fechaFormatted + "<br>" +
+      "<strong>Turno:</strong> " + (turno.charAt(0).toUpperCase() + turno.slice(1)) + "<br>" +
+      "<strong>Hora inicial:</strong> " + hora + "<br>" +
+      "<strong>Duración:</strong> " + duracion + " hora(s)<br>" +
+      "<strong>Última sync:</strong> " + new Date(ultimaSincronizacion).toLocaleTimeString();
   }
 
   const recursos = turno === "matutino" ? recursosMatutino : recursosVespertino;
@@ -528,27 +353,29 @@ function actualizarUIConsulta(fecha, turno, hora, duracion, horasSeleccionadas) 
   recursosGrid.innerHTML = "";
 
   const reservasActivasSet = new Set();
-  reservas.forEach(r => {
+  reservas.forEach(function(r) {
     if (!esPasado(r.fecha)) {
       reservasActivasSet.add(slotKey(r));
     }
   });
 
-  recursos.forEach((recurso) => {
-    const ocupado = horasSeleccionadas.some((hSel) =>
-      reservasActivasSet.has(buildKey(fecha, turno, hSel, recurso))
-    );
+  recursos.forEach(function(recurso) {
+    const ocupado = horasSeleccionadas.some(function(hSel) {
+      return reservasActivasSet.has(buildKey(fecha, turno, hSel, recurso));
+    });
 
     const card = document.createElement("div");
     card.className = "recurso-card " + (ocupado ? "ocupado" : "disponible");
     card.innerHTML = 
       '<div class="recurso-nombre">' + recurso + '</div>' +
       '<div class="recurso-estado ' + (ocupado ? "estado-ocupado" : "estado-disponible") + '">' +
-        (ocupado ? "❌ Ocupado" : "✅ Disponible") +
+        (ocupado ? "Ocupado" : "Disponible") +
       '</div>';
     
     if (!ocupado) {
-      card.onclick = () => realizarReservaAtomica(fecha, turno, hora, recurso);
+      card.onclick = function() { 
+        realizarReserva(fecha, turno, hora, recurso); 
+      };
     }
     
     recursosGrid.appendChild(card);
@@ -560,30 +387,24 @@ function mostrarCargando(mostrar) {
   if (!recursosGrid) return;
   
   if (mostrar) {
-    recursosGrid.innerHTML = '<div class="alert alert-warning">🔄 Consultando disponibilidad en servidor...</div>';
+    recursosGrid.innerHTML = '<div class="alert alert-warning">Consultando disponibilidad en servidor...</div>';
   }
 }
 
-// Función de compatibilidad
-function realizarReserva(fecha, turno, hora, recurso) {
-  return realizarReservaAtomica(fecha, turno, hora, recurso);
-}
-
-/* =================== Funciones de UI existentes =================== */
-
+// Funciones de UI
 function actualizarReservas() {
   const container = document.getElementById("reservas-container");
   if (!container) return;
 
-  const reservasActivas = reservas.filter((r) => !esPasado(r.fecha));
+  const reservasActivas = reservas.filter(function(r) { return !esPasado(r.fecha); });
 
   if (reservasActivas.length === 0) {
-    container.innerHTML = '<div class="alert alert-warning">🔭 No tenés reservas activas</div>';
+    container.innerHTML = '<div class="alert alert-warning">No tienes reservas activas</div>';
     return;
   }
 
   container.innerHTML = "";
-  reservasActivas.forEach((reserva) => {
+  reservasActivas.forEach(function(reserva) {
     const fechaFormatted = new Date(reserva.fecha + "T00:00:00").toLocaleDateString("es-ES");
     const item = document.createElement("div");
     item.className = "reserva-item";
@@ -591,11 +412,11 @@ function actualizarReservas() {
       '<div class="reserva-info">' +
         '<div class="reserva-recurso">' + reserva.recurso + '</div>' +
         '<div class="reserva-detalles">' +
-          '📅 ' + fechaFormatted + ' | 🕐 ' + reserva.turno + ' | ⏰ ' + reserva.hora + '<br>' +
-          '👤 ' + reserva.nombre + ' ' + reserva.apellido +
+          fechaFormatted + ' | ' + reserva.turno + ' | ' + reserva.hora + '<br>' +
+          reserva.nombre + ' ' + reserva.apellido +
         '</div>' +
       '</div>' +
-      '<button class="btn-cancelar" onclick="cancelarReserva(' + reserva.id + ')">❌ Cancelar</button>';
+      '<button class="btn-cancelar" onclick="cancelarReserva(' + reserva.id + ')">Cancelar</button>';
     container.appendChild(item);
   });
 }
@@ -611,7 +432,7 @@ function actualizarHoras() {
   if (turno === "matutino") horas = horasMatutino;
   if (turno === "vespertino") horas = horasVespertino;
 
-  horas.forEach((hora) => {
+  horas.forEach(function(hora) {
     const option = document.createElement("option");
     option.value = hora;
     option.textContent = hora;
@@ -635,13 +456,13 @@ function consultarDisponibilidad() {
 }
 
 async function cancelarReserva(id) {
-  const confirmacion = confirm("¿Estás seguro de que querés cancelar esta reserva?");
+  const confirmacion = confirm("¿Estás seguro de que quieres cancelar esta reserva?");
   if (!confirmacion) return;
 
   try {
-    const reserva = reservas.find(r => r.id === id);
+    const reserva = reservas.find(function(r) { return r.id == id; });
     if (!reserva) {
-      alert("❌ Reserva no encontrada");
+      alert("Reserva no encontrada");
       return;
     }
 
@@ -650,30 +471,44 @@ async function cancelarReserva(id) {
     url.searchParams.set("id", id);
 
     const response = await fetch(url.toString());
-    const result = await response.json();
+    
+    // Manejar respuesta que puede no ser JSON
+    let result;
+    const responseText = await response.text();
+    
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      // Verificar si el texto indica éxito
+      if (responseText.toLowerCase().includes("cancel") || responseText.toLowerCase().includes("exitoso")) {
+        result = { status: "ok" };
+      } else {
+        result = { status: "error", message: "Error desconocido" };
+      }
+    }
 
     if (result.status === "ok") {
-      reservas = reservas.filter((reserva) => reserva.id !== id);
+      reservas = reservas.filter(function(reserva) { return reserva.id != id; });
       localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
       
-      alert("✅ Reserva cancelada exitosamente");
+      alert("Reserva cancelada exitosamente");
       
       actualizarReservas();
       actualizarReportes();
       consultarDisponibilidadServidor();
     } else {
-      alert("❌ Error cancelando reserva: " + (result.message || "Error desconocido"));
+      alert("Error cancelando reserva: " + (result.message || "Error desconocido"));
     }
   } catch (error) {
     console.error("Error cancelando reserva:", error);
-    alert("❌ Error cancelando reserva. Intentá nuevamente.");
+    alert("Error cancelando reserva. Intenta nuevamente.");
   }
 }
 
 function actualizarReportes() {
-  const reservasActivas = reservas.filter((r) => !esPasado(r.fecha));
+  const reservasActivas = reservas.filter(function(r) { return !esPasado(r.fecha); });
   const hoy = new Date().toISOString().split("T")[0];
-  const reservasHoy = reservasActivas.filter((r) => r.fecha === hoy);
+  const reservasHoy = reservasActivas.filter(function(r) { return r.fecha === hoy; });
 
   const totalEl = document.getElementById("total-reservas");
   const hoyEl = document.getElementById("reservas-hoy");
@@ -688,12 +523,14 @@ function actualizarReportes() {
   const reporteRecursos = document.getElementById("reporte-recursos");
   if (reporteRecursos) {
     const conteoRecursos = {};
-    getTodosLosRecursos().forEach((recurso) => {
-      conteoRecursos[recurso] = reservasActivas.filter((r) => r.recurso === recurso).length;
+    getTodosLosRecursos().forEach(function(recurso) {
+      conteoRecursos[recurso] = reservasActivas.filter(function(r) { return r.recurso === recurso; }).length;
     });
 
     reporteRecursos.innerHTML = "";
-    Object.entries(conteoRecursos).forEach(([recurso, cantidad]) => {
+    Object.entries(conteoRecursos).forEach(function(entry) {
+      const recurso = entry[0];
+      const cantidad = entry[1];
       const div = document.createElement("div");
       div.className = "reserva-item";
       div.innerHTML = 
@@ -708,12 +545,14 @@ function actualizarReportes() {
   const reporteTurnos = document.getElementById("reporte-turnos");
   if (reporteTurnos) {
     const conteoTurnos = {
-      matutino: reservasActivas.filter((r) => r.turno === "matutino").length,
-      vespertino: reservasActivas.filter((r) => r.turno === "vespertino").length
+      matutino: reservasActivas.filter(function(r) { return r.turno === "matutino"; }).length,
+      vespertino: reservasActivas.filter(function(r) { return r.turno === "vespertino"; }).length
     };
 
     reporteTurnos.innerHTML = "";
-    Object.entries(conteoTurnos).forEach(([turno, cantidad]) => {
+    Object.entries(conteoTurnos).forEach(function(entry) {
+      const turno = entry[0];
+      const cantidad = entry[1];
       const div = document.createElement("div");
       div.className = "reserva-item";
       div.innerHTML = 
@@ -727,26 +566,32 @@ function actualizarReportes() {
 }
 
 function cambiarTab(tabName) {
-  document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(function(c) { 
+    c.classList.remove("active"); 
+  });
+  
   const target = document.getElementById("tab-" + tabName);
   if (target) target.classList.add("active");
 
   const tabs = document.querySelectorAll(".tabs .tab");
-  tabs.forEach((t) => t.classList.remove("active"));
+  tabs.forEach(function(t) { t.classList.remove("active"); });
+  
   const indexByName = { disponibilidad: 0, reservas: 1, reportes: 2 };
   const idx = indexByName[tabName];
-  if (typeof idx === "number" && tabs[idx]) tabs[idx].classList.add("active");
+  if (typeof idx === "number" && tabs[idx]) {
+    tabs[idx].classList.add("active");
+  }
 
   if (tabName === "reservas") {
-    sincronizarConServidor().then(() => actualizarReservas());
+    sincronizarConServidor().then(function() { actualizarReservas(); });
   }
   if (tabName === "reportes") {
-    sincronizarConServidor().then(() => actualizarReportes());
+    sincronizarConServidor().then(function() { actualizarReportes(); });
   }
 }
 
 function limpiarReservasVencidas() {
-  const activas = reservas.filter((r) => !esPasado(r.fecha));
+  const activas = reservas.filter(function(r) { return !esPasado(r.fecha); });
   if (activas.length !== reservas.length) {
     reservas = activas;
     localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
@@ -771,28 +616,31 @@ function limpiarSeleccion() {
   if (msg) msg.style.display = "block";
   if (detalles) detalles.innerHTML = "";
   if (grid) grid.innerHTML = "";
-  
-  // Limpiar también el estado de reserva si existe
-  limpiarEstadoReserva();
 }
 
-/* =================== Inicialización =================== */
-
-document.addEventListener("DOMContentLoaded", async () => {
+// Inicialización
+document.addEventListener("DOMContentLoaded", async function() {
   const hoy = new Date().toISOString().split("T")[0];
   const fechaEl = document.getElementById("fecha");
   if (fechaEl) fechaEl.value = hoy;
 
-  await sincronizarConServidor();
+  console.log("Iniciando sistema - Session ID:", sessionId);
+  console.log("Endpoint:", endpoint);
+
+  const sincronizado = await sincronizarConServidor();
+  if (sincronizado) {
+    console.log("Sincronización inicial exitosa");
+  } else {
+    console.warn("Sincronización inicial falló, trabajando offline");
+  }
+  
   actualizarReservas();
   actualizarReportes();
   limpiarReservasVencidas();
-  
-  console.log("Sistema iniciado - Session ID:", sessionId);
 });
 
 // Sincronización automática cada 30 segundos
-setInterval(async () => {
+setInterval(async function() {
   await sincronizarConServidor();
   const tabActivo = document.querySelector('.tab-content.active');
   if (tabActivo && tabActivo.id === 'tab-disponibilidad') {
@@ -810,104 +658,46 @@ setInterval(async () => {
 // Limpiar reservas vencidas cada 5 minutos
 setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
 
-/* =================== Debug y utilidades adicionales =================== */
-
+// Debug
 function debugReserva() {
   console.log("=== Estado actual del sistema ===");
   console.log("Reservas en cache:", reservas.length);
   console.log("Última sincronización:", new Date(ultimaSincronizacion).toLocaleString());
   console.log("Session ID:", sessionId);
-  console.log("Fecha actual:", new Date().toISOString().split("T")[0]);
-  console.log("Reserva en progreso:", reservaEnProgreso);
   console.log("Endpoint:", endpoint);
   console.log("=================================");
-  
   return {
     reservas: reservas.length,
     ultimaSync: new Date(ultimaSincronizacion).toLocaleString(),
-    sessionId: sessionId,
-    reservaEnProgreso: reservaEnProgreso
+    sessionId: sessionId
   };
 }
 
-// Función para forzar sincronización manual
 async function forzarSincronizacion() {
-  console.log("🔄 Forzando sincronización...");
-  mostrarEstadoReserva("🔄 Sincronizando datos...", "info");
-  
+  console.log("Forzando sincronización...");
   const exito = await sincronizarConServidor();
-  
-  if (exito) {
-    console.log("✅ Sincronización exitosa");
-    mostrarEstadoReserva("✅ Datos sincronizados correctamente", "success");
-  } else {
-    console.log("❌ Sincronización falló");
-    mostrarEstadoReserva("❌ Error en la sincronización", "error");
-  }
+  console.log("Sincronización:", exito ? "exitosa" : "falló");
   
   actualizarReservas();
   actualizarReportes();
   
-  if (document.querySelector('.tab-content.active')?.id === 'tab-disponibilidad') {
+  if (document.querySelector('.tab-content.active') && document.querySelector('.tab-content.active').id === 'tab-disponibilidad') {
     consultarDisponibilidadServidor();
   }
   
-  setTimeout(() => limpiarEstadoReserva(), 3000);
   return exito;
 }
 
-// Función para verificar conectividad
-async function verificarConectividad() {
-  try {
-    const response = await fetch(endpoint + "?action=ping", {
-      method: "GET",
-      signal: AbortSignal.timeout(5000)
-    });
-    
-    if (response.ok) {
-      actualizarEstadoConexion("online", "Servidor disponible");
-      return true;
-    } else {
-      actualizarEstadoConexion("offline", "Error HTTP " + response.status);
-      return false;
-    }
-  } catch (error) {
-    actualizarEstadoConexion("offline", "Sin respuesta del servidor");
-    return false;
-  }
-}
-
-// Función para limpiar cache local
-function limpiarCacheLocal() {
-  if (confirm("¿Estás seguro de que querés limpiar el cache local? Esto eliminará todas las reservas guardadas localmente.")) {
-    localStorage.removeItem("reservasLiceo");
-    reservas = [];
-    ultimaSincronizacion = 0;
-    
-    mostrarEstadoReserva("🗑️ Cache local limpiado", "info");
-    
-    actualizarReservas();
-    actualizarReportes();
-    
-    // Forzar sincronización
-    setTimeout(() => {
-      forzarSincronizacion();
-    }, 1000);
-    
-    setTimeout(() => limpiarEstadoReserva(), 3000);
-  }
-}
-
-// Exportar funciones de debug para la consola
+// Exportar funciones de debug
 window.debugSistema = {
   debug: debugReserva,
   sync: forzarSincronizacion,
-  ping: verificarConectividad,
-  clean: limpiarCacheLocal,
-  estado: () => ({
-    reservas: reservas,
-    sessionId: sessionId,
-    ultimaSync: new Date(ultimaSincronizacion),
-    enProgreso: reservaEnProgreso
-  })
+  estado: function() {
+    return {
+      reservas: reservas,
+      sessionId: sessionId,
+      ultimaSync: new Date(ultimaSincronizacion),
+      enProgreso: reservaEnProgreso
+    };
+  }
 };
