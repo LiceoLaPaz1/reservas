@@ -3,7 +3,7 @@
 
 // Configuración
 const endpoint = new URLSearchParams(location.search).get("api") || 
-  "https://script.google.com/macros/s/AKfycbyfXzc9nEEQuI0dXLjMnlCOmxy78ZFYD9SevyGNahXr5hI-ZKJmEYTrIizTSOlnatDS/exec";
+ "https://script.google.com/macros/s/AKfycbyfXzc9nEEQuI0dXLjMnlCOmxy78ZFYD9SevyGNahXr5hI-ZKJmEYTrIizTSOlnatDS/exec";
 
 // Recursos por turno
 const recursosMatutino = [
@@ -663,7 +663,7 @@ setInterval(async function() {
 // Limpiar reservas vencidas cada 5 minutos
 setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
 
-// Debug
+// Debug mejorado
 function debugReserva() {
   console.log("=== Estado actual del sistema ===");
   console.log("Reservas en cache:", reservas.length);
@@ -671,18 +671,31 @@ function debugReserva() {
   console.log("Última sincronización:", new Date(ultimaSincronizacion).toLocaleString());
   console.log("Session ID:", sessionId);
   console.log("Endpoint:", endpoint);
-  console.log("=================================");
   
   // Verificar formatos de fecha
   if (reservas.length > 0) {
-    console.log("Primera reserva:", reservas[0]);
-    console.log("Formato fecha primera reserva:", typeof reservas[0].fecha, reservas[0].fecha);
+    console.log("=== Análisis de fechas ===");
+    reservas.forEach(function(reserva, index) {
+      console.log("Reserva " + index + ":");
+      console.log("  - ID:", reserva.id);
+      console.log("  - Fecha original:", reserva.fecha, "(tipo: " + typeof reserva.fecha + ")");
+      console.log("  - Recurso:", reserva.recurso);
+      console.log("  - Turno:", reserva.turno, "Hora:", reserva.hora);
+      
+      // Verificar si la fecha se puede usar para comparaciones
+      const fechaNormalizada = normalizarFecha(reserva.fecha);
+      console.log("  - Fecha normalizada:", fechaNormalizada);
+      console.log("  - Es pasado:", esPasado(fechaNormalizada));
+    });
   }
+  
+  console.log("=================================");
   
   return {
     reservas: reservas.length,
     ultimaSync: new Date(ultimaSincronizacion).toLocaleString(),
-    sessionId: sessionId
+    sessionId: sessionId,
+    fechasValidas: reservas.filter(function(r) { return normalizarFecha(r.fecha) !== null; }).length
   };
 }
 
