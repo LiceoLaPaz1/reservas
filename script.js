@@ -665,37 +665,23 @@ setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
 
 // Debug mejorado
 function debugReserva() {
-  console.log("=== Estado actual del sistema ===");
+  console.log("=== NUEVO DEBUG - Estado actual del sistema ===");
   console.log("Reservas en cache:", reservas.length);
-  console.log("Reservas completas:", reservas);
-  console.log("Última sincronización:", new Date(ultimaSincronizacion).toLocaleString());
-  console.log("Session ID:", sessionId);
-  console.log("Endpoint:", endpoint);
   
-  // Verificar formatos de fecha
   if (reservas.length > 0) {
-    console.log("=== Análisis de fechas ===");
+    console.log("=== Analisis de fechas ===");
     reservas.forEach(function(reserva, index) {
       console.log("Reserva " + index + ":");
-      console.log("  - ID:", reserva.id);
-      console.log("  - Fecha original:", reserva.fecha, "(tipo: " + typeof reserva.fecha + ")");
+      console.log("  - Fecha original:", reserva.fecha);
       console.log("  - Recurso:", reserva.recurso);
-      console.log("  - Turno:", reserva.turno, "Hora:", reserva.hora);
-      
-      // Verificar si la fecha se puede usar para comparaciones
-      const fechaNormalizada = normalizarFecha(reserva.fecha);
-      console.log("  - Fecha normalizada:", fechaNormalizada);
-      console.log("  - Es pasado:", esPasado(fechaNormalizada));
+      console.log("  - Turno/Hora:", reserva.turno, reserva.hora);
     });
   }
-  
-  console.log("=================================");
   
   return {
     reservas: reservas.length,
     ultimaSync: new Date(ultimaSincronizacion).toLocaleString(),
-    sessionId: sessionId,
-    fechasValidas: reservas.filter(function(r) { return normalizarFecha(r.fecha) !== null; }).length
+    sessionId: sessionId
   };
 }
 
