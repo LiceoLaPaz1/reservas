@@ -3,7 +3,7 @@
 
 // Configuración
 const endpoint = new URLSearchParams(location.search).get("api") || 
-  "https://script.google.com/macros/s/AKfycbwfQdx0QdsB6zZW6AhE3793Tc0Qu4y0-2eSTcGP9Uj6SkRTiaQ6yFk7Xp5Qze8gp-CZ/exec";
+  "https://script.google.com/macros/s/AKfycbyfXzc9nEEQuI0dXLjMnlCOmxy78ZFYD9SevyGNahXr5hI-ZKJmEYTrIizTSOlnatDS/exec";
 
 // Recursos por turno
 const recursosMatutino = [
