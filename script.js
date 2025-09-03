@@ -667,10 +667,18 @@ setInterval(limpiarReservasVencidas, 5 * 60 * 1000);
 function debugReserva() {
   console.log("=== Estado actual del sistema ===");
   console.log("Reservas en cache:", reservas.length);
+  console.log("Reservas completas:", reservas);
   console.log("Última sincronización:", new Date(ultimaSincronizacion).toLocaleString());
   console.log("Session ID:", sessionId);
   console.log("Endpoint:", endpoint);
   console.log("=================================");
+  
+  // Verificar formatos de fecha
+  if (reservas.length > 0) {
+    console.log("Primera reserva:", reservas[0]);
+    console.log("Formato fecha primera reserva:", typeof reservas[0].fecha, reservas[0].fecha);
+  }
+  
   return {
     reservas: reservas.length,
     ultimaSync: new Date(ultimaSincronizacion).toLocaleString(),
