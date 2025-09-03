@@ -678,7 +678,7 @@ async function forzarSincronizacion() {
   const exito = await sincronizarConServidor();
   console.log("Sincronización:", exito ? "exitosa" : "falló");
   
-  actualizarReservas();
+  actualizarReservas();  
   actualizarReportes();
   
   if (document.querySelector('.tab-content.active') && document.querySelector('.tab-content.active').id === 'tab-disponibilidad') {
