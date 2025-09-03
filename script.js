@@ -466,15 +466,20 @@ async function cancelarReserva(id) {
       return;
     }
 
-    const url = new URL(endpoint);
-    url.searchParams.set("action", "cancel");
-    url.searchParams.set("id", id);
+    // Usar POST en lugar de GET para cancelar
+    const formData = new URLSearchParams();
+    formData.append("action", "cancel");
+    formData.append("id", id);
 
-    const response = await fetch(url.toString());
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData
+    });
     
-    // Manejar respuesta que puede no ser JSON
-    let result;
+    // Manejar respuesta
     const responseText = await response.text();
+    let result;
     
     try {
       result = JSON.parse(responseText);
@@ -678,7 +683,7 @@ async function forzarSincronizacion() {
   const exito = await sincronizarConServidor();
   console.log("Sincronización:", exito ? "exitosa" : "falló");
   
-  actualizarReservas();  
+  actualizarReservas();
   actualizarReportes();
   
   if (document.querySelector('.tab-content.active') && document.querySelector('.tab-content.active').id === 'tab-disponibilidad') {
