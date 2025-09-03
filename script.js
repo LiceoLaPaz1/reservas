@@ -24,6 +24,35 @@ let reservaEnProgreso = false;
 let ultimaSincronizacion = 0;
 let sessionId = generateSessionId();
 
+function normalizarFecha(fechaServidor) {
+  if (!fechaServidor) return null;
+  
+  try {
+    // Si ya viene en formato YYYY-MM-DD, devolverla tal como está
+    if (typeof fechaServidor === 'string' && fechaServidor.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return fechaServidor;
+    }
+    
+    // Si viene como Date string completo o timestamp, parsearlo
+    var fecha = new Date(fechaServidor);
+    
+    if (isNaN(fecha.getTime())) {
+      console.warn("Fecha inválida:", fechaServidor);
+      return null;
+    }
+    
+    // Convertir a formato YYYY-MM-DD
+    var year = fecha.getFullYear();
+    var month = String(fecha.getMonth() + 1).padStart(2, '0');
+    var day = String(fecha.getDate()).padStart(2, '0');
+    
+    return year + "-" + month + "-" + day;
+  } catch (error) {
+    console.error("Error normalizando fecha:", fechaServidor, error);
+    return null;
+  }
+}
+
 // Cargar cache local
 try {
   const cached = JSON.parse(localStorage.getItem("reservasLiceo")) || [];
