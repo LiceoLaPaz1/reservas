@@ -125,7 +125,25 @@ async function sincronizarConServidor(maxRetries) {
       }
       
       if (data.status === "ok" && Array.isArray(data.reservas)) {
-        reservas = data.reservas.filter(function(r) { return !esPasado(r.fecha); });
+        var reservasNormalizadas = data.reservas.map(function(reserva) {
+  var fechaNormalizada = normalizarFecha(reserva.fecha);
+  return {
+    id: reserva.id,
+    nombre: reserva.nombre,
+    apellido: reserva.apellido,
+    fecha: fechaNormalizada,
+    turno: reserva.turno,
+    hora: reserva.hora,
+    recurso: reserva.recurso,
+    cantidadHoras: reserva.cantidadHoras,
+    fechaReserva: reserva.fechaReserva
+  };
+}).filter(function(r) { 
+  return r.fecha && !esPasado(r.fecha);
+});
+
+reservas = reservasNormalizadas;
+console.log("Reservas normalizadas:", reservas.length);
         localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
         ultimaSincronizacion = Date.now();
         return true;
