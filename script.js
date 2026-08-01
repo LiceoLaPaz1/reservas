@@ -218,6 +218,22 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       return;
     }
 
+    const yaTieneOtraReserva = horasSeleccionadas.some(function(hSel) {
+      return reservas.some(function(r) {
+        return !esPasado(r.fecha) &&
+               r.fecha === fecha &&
+               r.turno === turno &&
+               r.hora === hSel &&
+               r.nombre.trim().toLowerCase() === nombre.toLowerCase() &&
+               r.apellido.trim().toLowerCase() === apellido.toLowerCase();
+      });
+    });
+
+    if (yaTieneOtraReserva) {
+      mostrarEstado("Ya tenés otra reserva en alguna de esas horas.", "warning");
+      return;
+    }
+
     // Confirmar reserva
     const confirmacion = confirm(
       "¿Confirmar reserva?\n\n" +
@@ -232,11 +248,12 @@ async function realizarReserva(fecha, turno, hora, recurso) {
 
     // Realizar reservas
     let reservasExitosas = 0;
+    let mensajeFallo = null;
     const nuevasReservas = [];
 
     for (let i = 0; i < horasSeleccionadas.length; i++) {
       const h = horasSeleccionadas[i];
-      
+
       const nuevaReserva = {
         id: Date.now() + i + Math.floor(Math.random() * 1000),
         fecha: fecha,
@@ -249,12 +266,13 @@ async function realizarReserva(fecha, turno, hora, recurso) {
         fechaReserva: new Date().toISOString()
       };
 
-      const exito = await enviarReservaServidor(nuevaReserva);
-      if (exito) {
+      const resultado = await enviarReservaServidor(nuevaReserva);
+      if (resultado.exito) {
         nuevasReservas.push(nuevaReserva);
         reservasExitosas++;
       } else {
         console.warn("Fallo reserva para hora " + h + ", cancelando proceso");
+        mensajeFallo = resultado.mensaje;
         break;
       }
     }
@@ -263,7 +281,7 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       // Todas exitosas
       reservas = reservas.concat(nuevasReservas);
       localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
-      
+
       mostrarEstado(
         "Reserva realizada exitosamente!\n" +
         recurso + " - " + fecha + " - " + turno + "\n" +
@@ -272,8 +290,8 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       );
     } else {
       mostrarEstado(
-        "Solo se pudieron reservar " + reservasExitosas + " de " + horasSeleccionadas.length + " horas.\n" +
-        "Algunas ya estaban ocupadas por otro docente.",
+        (mensajeFallo || "Algunas horas ya estaban ocupadas.") +
+        "\nSolo se pudieron reservar " + reservasExitosas + " de " + horasSeleccionadas.length + " horas.",
         "warning"
       );
     }
@@ -299,16 +317,17 @@ async function enviarReservaServidor(reservaData) {
       body: JSON.stringify(reservaData)
     });
 
+    const result = await response.json();
+
     if (response.status === 409) {
-      console.warn("Conflicto detectado: el recurso ya estaba reservado");
-      return false;
+      console.warn("Conflicto detectado:", result.message);
+      return { exito: false, mensaje: result.message };
     }
 
-    const result = await response.json();
-    return response.ok && result.status === "success";
+    return { exito: response.ok && result.status === "success", mensaje: result.message };
   } catch (error) {
     console.error("Error enviando reserva:", error);
-    return false;
+    return { exito: false, mensaje: null };
   }
 }
 

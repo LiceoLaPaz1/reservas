@@ -42,7 +42,13 @@ module.exports = async function handler(req, res) {
       res.status(201).json({ status: "success", reserva: rows[0] });
     } catch (error) {
       if (error && error.code === "23505") {
-        res.status(409).json({ status: "conflict", message: "Ese recurso ya está reservado en ese horario" });
+        const esConflictoDocente = error.constraint && error.constraint.indexOf("docente") !== -1;
+        res.status(409).json({
+          status: "conflict",
+          message: esConflictoDocente
+            ? "Ya tenés otra reserva en ese mismo horario"
+            : "Ese recurso ya está reservado en ese horario"
+        });
         return;
       }
       console.error(error);
