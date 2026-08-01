@@ -1,9 +1,8 @@
-// Sistema de Reservas - Versión compatible con servidor actual
-// Prevención básica de colisiones + sincronización mejorada
+// Sistema de Reservas - Backend propio en Vercel + Postgres (Neon)
+// Prevención de colisiones a nivel de base de datos (restricción UNIQUE)
 
 // Configuración
-const endpoint = new URLSearchParams(location.search).get("api") || 
- "https://script.google.com/macros/s/AKfycbyfXzc9nEEQuI0dXLjMnlCOmxy78ZFYD9SevyGNahXr5hI-ZKJmEYTrIizTSOlnatDS/exec";
+const endpoint = "/api/reservas";
 
 // Recursos por turno
 const recursosMatutino = [
@@ -96,34 +95,21 @@ async function sincronizarConServidor(maxRetries) {
   
   for (let intento = 0; intento < maxRetries; intento++) {
     try {
-      const url = new URL(endpoint);
-      url.searchParams.set("action", "getAll");
-      
       const controller = new AbortController();
       const timeoutId = setTimeout(function() { controller.abort(); }, 10000);
-      
-      const response = await fetch(url.toString(), {
+
+      const response = await fetch(endpoint, {
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         throw new Error("HTTP " + response.status);
       }
-      
-      // Intentar parsear como JSON, si falla, asumir que es texto
-      let data;
-      const responseText = await response.text();
-      
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.warn("Respuesta no es JSON válido:", responseText);
-        // Si no es JSON, asumir que la conexión funciona pero no hay datos
-        return true;
-      }
-      
+
+      const data = await response.json();
+
       if (data.status === "ok" && Array.isArray(data.reservas)) {
         var reservasNormalizadas = data.reservas.map(function(reserva) {
   var fechaNormalizada = normalizarFecha(reserva.fecha);
@@ -301,34 +287,19 @@ async function realizarReserva(fecha, turno, hora, recurso) {
 
 async function enviarReservaServidor(reservaData) {
   try {
-    const formData = new URLSearchParams();
-    formData.append("data", JSON.stringify(reservaData));
-
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reservaData)
     });
 
-    // Manejar respuesta que puede no ser JSON
-    const responseText = await response.text();
-    
-    try {
-      const result = JSON.parse(responseText);
-      return result.status === "success";
-    } catch (parseError) {
-      // Si no es JSON, verificar si contiene indicadores de éxito
-      const textoLower = responseText.toLowerCase();
-      if (textoLower.includes("success") || textoLower.includes("exitoso")) {
-        return true;
-      } else if (textoLower.includes("conflict") || textoLower.includes("ocupado")) {
-        console.warn("Conflicto detectado:", responseText);
-        return false;
-      } else {
-        console.error("Respuesta del servidor no reconocida:", responseText);
-        return false;
-      }
+    if (response.status === 409) {
+      console.warn("Conflicto detectado: el recurso ya estaba reservado");
+      return false;
     }
+
+    const result = await response.json();
+    return response.ok && result.status === "success";
   } catch (error) {
     console.error("Error enviando reserva:", error);
     return false;
@@ -513,33 +484,13 @@ async function cancelarReserva(id) {
       return;
     }
 
-    // Usar POST en lugar de GET para cancelar
-    const formData = new URLSearchParams();
-    formData.append("action", "cancel");
-    formData.append("id", id);
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData
+    const response = await fetch(endpoint + "/" + id, {
+      method: "DELETE"
     });
-    
-    // Manejar respuesta
-    const responseText = await response.text();
-    let result;
-    
-    try {
-      result = JSON.parse(responseText);
-    } catch (parseError) {
-      // Verificar si el texto indica éxito
-      if (responseText.toLowerCase().includes("cancel") || responseText.toLowerCase().includes("exitoso")) {
-        result = { status: "ok" };
-      } else {
-        result = { status: "error", message: "Error desconocido" };
-      }
-    }
 
-    if (result.status === "ok") {
+    const result = await response.json();
+
+    if (response.ok && result.status === "ok") {
       reservas = reservas.filter(function(reserva) { return reserva.id != id; });
       localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
       
