@@ -4,24 +4,59 @@
 // Configuración
 const endpoint = "/api/reservas";
 
-// Recursos por turno
-const recursosMatutino = [
-  "Cañón", "TV Planta Baja", "TV Planta Alta", "TV 43\"", "Caja TV 50\"", "Caja TV 43"
-];
-
-const recursosVespertino = [
-  "Cañón", "TV Planta Baja", "TV Planta Alta", "TV 43\"", "Caja TV 50\"", "Caja TV 43",
-  "Sala de Informática", "Salón 10"
-];
-
-const horasMatutino = ["1era", "2da", "3era", "4ta", "5ta", "6ta", "7ma", "8va"];
-const horasVespertino = ["0", "1era", "2da", "3era", "4ta", "5ta", "6ta", "7ma"];
-
 // Estado global
 let reservas = [];
 let reservaEnProgreso = false;
 let ultimaSincronizacion = 0;
 let sessionId = generateSessionId();
+
+// Turnos, horas y recursos: se cargan desde la base (administrables desde el panel)
+let turnosData = [];
+let recursosData = [];
+
+async function cargarConfiguracion() {
+  try {
+    const [rTurnos, rRecursos] = await Promise.all([fetch("/api/turnos"), fetch("/api/recursos")]);
+    const bTurnos = await rTurnos.json();
+    const bRecursos = await rRecursos.json();
+    turnosData = bTurnos.turnos || [];
+    recursosData = bRecursos.recursos || [];
+    poblarSelectTurnos();
+  } catch (error) {
+    console.error("Error cargando turnos/recursos:", error);
+  }
+}
+
+function poblarSelectTurnos() {
+  const turnoSelect = document.getElementById("turno");
+  if (!turnoSelect) return;
+  const valorActual = turnoSelect.value;
+
+  turnoSelect.innerHTML = '<option value="">Seleccionar turno</option>';
+  turnosData.forEach(function (t) {
+    const option = document.createElement("option");
+    option.value = t.nombre;
+    option.textContent = t.etiqueta;
+    turnoSelect.appendChild(option);
+  });
+
+  if (valorActual) turnoSelect.value = valorActual;
+}
+
+function getHorasTurno(turnoNombre) {
+  const turno = turnosData.find(function (t) { return t.nombre === turnoNombre; });
+  if (!turno) return [];
+  return turno.horas
+    .slice()
+    .sort(function (a, b) { return a.orden - b.orden; })
+    .map(function (h) { return h.etiqueta; });
+}
+
+function getRecursosTurno(turnoNombre) {
+  return recursosData
+    .filter(function (r) { return r.turnos.indexOf(turnoNombre) !== -1; })
+    .map(function (r) { return r.nombre; });
+}
 
 function normalizarFecha(fechaServidor) {
   if (!fechaServidor) return null;
@@ -184,7 +219,7 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       return;
     }
 
-    const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
+    const horasTurno = getHorasTurno(turno);
     const indiceHora = horasTurno.indexOf(hora);
 
     if (indiceHora === -1) {
@@ -345,7 +380,7 @@ async function consultarDisponibilidadServidor() {
   try {
     await sincronizarConServidor();
 
-    const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
+    const horasTurno = getHorasTurno(turno);
     const indiceHora = horasTurno.indexOf(hora);
     if (indiceHora === -1) {
       mostrarEstado("Hora inválida", "error");
@@ -389,7 +424,7 @@ function actualizarUIConsulta(fecha, turno, hora, duracion, horasSeleccionadas) 
       "<strong>Última sync:</strong> " + new Date(ultimaSincronizacion).toLocaleTimeString();
   }
 
-  const recursos = turno === "matutino" ? recursosMatutino : recursosVespertino;
+  const recursos = getRecursosTurno(turno);
   const recursosGrid = document.getElementById("recursos-grid");
   if (!recursosGrid) return;
   
@@ -489,9 +524,7 @@ function actualizarHoras() {
 
   horaSelect.innerHTML = '<option value="">Seleccionar hora</option>';
 
-  let horas = [];
-  if (turno === "matutino") horas = horasMatutino;
-  if (turno === "vespertino") horas = horasVespertino;
+  const horas = getHorasTurno(turno);
 
   horas.forEach(function(hora) {
     const option = document.createElement("option");
@@ -677,6 +710,247 @@ function renderReporteTabla(filas) {
   container.innerHTML = html;
 }
 
+// Administración de turnos, horas y recursos (panel admin)
+function mostrarPanelAdmin(nombre) {
+  const panelReporte = document.getElementById("panel-reporte");
+  const panelConfig = document.getElementById("panel-config");
+  if (panelReporte) panelReporte.style.display = nombre === "reporte" ? "block" : "none";
+  if (panelConfig) panelConfig.style.display = nombre === "config" ? "block" : "none";
+
+  const tabs = document.querySelectorAll("#reporte-admin .tabs .tab");
+  tabs.forEach(function (t) { t.classList.remove("active"); });
+  const idx = nombre === "reporte" ? 0 : 1;
+  if (tabs[idx]) tabs[idx].classList.add("active");
+
+  if (nombre === "config") {
+    cargarAdminConfig();
+  }
+}
+
+async function cargarAdminConfig() {
+  await cargarConfiguracion();
+  renderTurnosAdmin();
+  renderRecursosAdmin();
+}
+
+function renderTurnosAdmin() {
+  const container = document.getElementById("turnos-admin-container");
+  if (!container) return;
+
+  if (turnosData.length === 0) {
+    container.innerHTML = '<div class="alert alert-warning">No hay turnos cargados</div>';
+    return;
+  }
+
+  let html = "";
+  turnosData.forEach(function (t) {
+    const horasOrdenadas = t.horas.slice().sort(function (a, b) { return a.orden - b.orden; });
+    const chips = horasOrdenadas.map(function (h) {
+      return '<span style="display:inline-flex;align-items:center;gap:4px;background:#e9ecef;border-radius:12px;padding:3px 10px;margin:3px;">' +
+        h.etiqueta +
+        '<button onclick="eliminarHora(' + h.id + ')" title="Eliminar hora" style="border:none;background:none;color:#dc3545;cursor:pointer;font-weight:bold;">×</button>' +
+        '</span>';
+    }).join("");
+
+    html += '<div class="reserva-item" style="flex-direction:column;align-items:stretch;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+      '<strong>' + t.etiqueta + '</strong>&nbsp;<span style="color:#6c757d;font-size:13px;">(' + t.nombre + ')</span>' +
+      '<button class="btn-cancelar" onclick="eliminarTurno(' + t.id + ')">Eliminar turno</button>' +
+      '</div>' +
+      '<div style="margin-top:8px;">' + (chips || '<em>sin horas</em>') + '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;">' +
+      '<input type="text" id="nueva-hora-' + t.id + '" placeholder="Nueva hora (ej: 9na)" style="flex:1;padding:8px;border:1px solid #dee2e6;border-radius:6px;" />' +
+      '<button class="btn btn-secondary" style="width:auto;" onclick="agregarHora(' + t.id + ')">+ Hora</button>' +
+      '</div>' +
+      '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+async function agregarTurno() {
+  const nombre = document.getElementById("nuevo-turno-nombre").value.trim().toLowerCase();
+  const etiqueta = document.getElementById("nuevo-turno-etiqueta").value.trim();
+
+  if (!nombre || !etiqueta) {
+    mostrarEstado("Completar nombre interno y nombre a mostrar del turno", "warning");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/turnos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: nombre, etiqueta: etiqueta, orden: turnosData.length + 1 })
+    });
+    const result = await response.json();
+
+    if (response.ok && result.status === "success") {
+      document.getElementById("nuevo-turno-nombre").value = "";
+      document.getElementById("nuevo-turno-etiqueta").value = "";
+      mostrarEstado("Turno agregado", "success");
+      await cargarAdminConfig();
+    } else {
+      mostrarEstado(result.message || "Error agregando el turno", "error");
+    }
+  } catch (error) {
+    console.error("Error agregando turno:", error);
+    mostrarEstado("Error agregando el turno. Intenta nuevamente.", "error");
+  }
+}
+
+async function eliminarTurno(id) {
+  const confirmacion = confirm("¿Eliminar este turno? También se eliminan sus horas y deja de poder reservarse en él.");
+  if (!confirmacion) return;
+
+  try {
+    const response = await fetch("/api/turnos/" + id, { method: "DELETE" });
+    const result = await response.json();
+
+    if (response.ok && result.status === "ok") {
+      mostrarEstado("Turno eliminado", "success");
+      await cargarAdminConfig();
+    } else {
+      mostrarEstado(result.message || "Error eliminando el turno", "error");
+    }
+  } catch (error) {
+    console.error("Error eliminando turno:", error);
+    mostrarEstado("Error eliminando el turno. Intenta nuevamente.", "error");
+  }
+}
+
+async function agregarHora(turnoId) {
+  const input = document.getElementById("nueva-hora-" + turnoId);
+  const etiqueta = input ? input.value.trim() : "";
+
+  if (!etiqueta) {
+    mostrarEstado("Escribir la etiqueta de la hora", "warning");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/turnos/" + turnoId + "/horas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ etiqueta: etiqueta })
+    });
+    const result = await response.json();
+
+    if (response.ok && result.status === "success") {
+      mostrarEstado("Hora agregada", "success");
+      await cargarAdminConfig();
+    } else {
+      mostrarEstado(result.message || "Error agregando la hora", "error");
+    }
+  } catch (error) {
+    console.error("Error agregando hora:", error);
+    mostrarEstado("Error agregando la hora. Intenta nuevamente.", "error");
+  }
+}
+
+async function eliminarHora(id) {
+  const confirmacion = confirm("¿Eliminar esta hora?");
+  if (!confirmacion) return;
+
+  try {
+    const response = await fetch("/api/horas/" + id, { method: "DELETE" });
+    const result = await response.json();
+
+    if (response.ok && result.status === "ok") {
+      mostrarEstado("Hora eliminada", "success");
+      await cargarAdminConfig();
+    } else {
+      mostrarEstado(result.message || "Error eliminando la hora", "error");
+    }
+  } catch (error) {
+    console.error("Error eliminando hora:", error);
+    mostrarEstado("Error eliminando la hora. Intenta nuevamente.", "error");
+  }
+}
+
+function renderRecursosAdmin() {
+  const container = document.getElementById("recursos-admin-container");
+  if (container) {
+    if (recursosData.length === 0) {
+      container.innerHTML = '<div class="alert alert-warning">No hay recursos cargados</div>';
+    } else {
+      let html = "";
+      recursosData.forEach(function (r) {
+        html += '<div class="reserva-item">' +
+          '<div class="reserva-info">' +
+          '<div class="reserva-recurso">' + r.nombre + '</div>' +
+          '<div class="reserva-detalles">' + (r.turnos.length ? r.turnos.join(", ") : "sin turno asignado") + '</div>' +
+          '</div>' +
+          '<button class="btn-cancelar" onclick="eliminarRecurso(' + r.id + ')">Eliminar</button>' +
+          '</div>';
+      });
+      container.innerHTML = html;
+    }
+  }
+
+  const checkboxesDiv = document.getElementById("nuevo-recurso-turnos");
+  if (checkboxesDiv) {
+    checkboxesDiv.innerHTML = "<label>Disponible en:</label><br>" +
+      turnosData.map(function (t) {
+        return '<label style="margin-right:15px;font-weight:normal;display:inline-flex;align-items:center;gap:4px;">' +
+          '<input type="checkbox" class="nuevo-recurso-turno-checkbox" value="' + t.id + '" /> ' + t.etiqueta +
+          '</label>';
+      }).join("");
+  }
+}
+
+async function agregarRecurso() {
+  const nombre = document.getElementById("nuevo-recurso-nombre").value.trim();
+
+  if (!nombre) {
+    mostrarEstado("Escribir el nombre del recurso", "warning");
+    return;
+  }
+
+  const turnoIds = Array.from(document.querySelectorAll(".nuevo-recurso-turno-checkbox:checked"))
+    .map(function (cb) { return parseInt(cb.value, 10); });
+
+  try {
+    const response = await fetch("/api/recursos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: nombre, turnoIds: turnoIds })
+    });
+    const result = await response.json();
+
+    if (response.ok && result.status === "success") {
+      document.getElementById("nuevo-recurso-nombre").value = "";
+      mostrarEstado("Recurso agregado", "success");
+      await cargarAdminConfig();
+    } else {
+      mostrarEstado(result.message || "Error agregando el recurso", "error");
+    }
+  } catch (error) {
+    console.error("Error agregando recurso:", error);
+    mostrarEstado("Error agregando el recurso. Intenta nuevamente.", "error");
+  }
+}
+
+async function eliminarRecurso(id) {
+  const confirmacion = confirm("¿Eliminar este recurso? Ya no va a poder reservarse.");
+  if (!confirmacion) return;
+
+  try {
+    const response = await fetch("/api/recursos/" + id, { method: "DELETE" });
+    const result = await response.json();
+
+    if (response.ok && result.status === "ok") {
+      mostrarEstado("Recurso eliminado", "success");
+      await cargarAdminConfig();
+    } else {
+      mostrarEstado(result.message || "Error eliminando el recurso", "error");
+    }
+  } catch (error) {
+    console.error("Error eliminando recurso:", error);
+    mostrarEstado("Error eliminando el recurso. Intenta nuevamente.", "error");
+  }
+}
+
 function cambiarTab(tabName) {
   document.querySelectorAll(".tab-content").forEach(function(c) { 
     c.classList.remove("active"); 
@@ -685,9 +959,10 @@ function cambiarTab(tabName) {
   const target = document.getElementById("tab-" + tabName);
   if (target) target.classList.add("active");
 
-  const tabs = document.querySelectorAll(".tabs .tab");
+  const navPrincipal = document.querySelector(".right-panel > .tabs");
+  const tabs = navPrincipal ? navPrincipal.querySelectorAll(".tab") : [];
   tabs.forEach(function(t) { t.classList.remove("active"); });
-  
+
   const indexByName = { disponibilidad: 0, reservas: 1, reportes: 2 };
   const idx = indexByName[tabName];
   if (typeof idx === "number" && tabs[idx]) {
@@ -738,6 +1013,8 @@ document.addEventListener("DOMContentLoaded", async function() {
 
   console.log("Iniciando sistema - Session ID:", sessionId);
   console.log("Endpoint:", endpoint);
+
+  await cargarConfiguracion();
 
   const sincronizado = await sincronizarConServidor();
   if (sincronizado) {

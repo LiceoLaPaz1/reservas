@@ -40,8 +40,6 @@
             <label for="turno">🕒 Turno:</label>
             <select id="turno" onchange="actualizarHoras()">
               <option value="">Seleccionar turno</option>
-              <option value="matutino">Matutino (1era a 8va)</option>
-              <option value="vespertino">Vespertino (0 a 7ma)</option>
             </select>
           </div>
 
@@ -123,17 +121,47 @@
             </div>
 
             <div id="reporte-admin" style="display: none">
-              <h3>📊 Reporte de reservas</h3>
-              <div class="form-group">
-                <label for="reporte-fecha">Filtrar por fecha:</label>
-                <input type="date" id="reporte-fecha" />
+              <div class="tabs">
+                <div class="tab active" onclick="mostrarPanelAdmin('reporte')">📊 Reporte</div>
+                <div class="tab" onclick="mostrarPanelAdmin('config')">🗂️ Recursos y turnos</div>
               </div>
-              <button class="btn" onclick="filtrarReporte()">Filtrar</button>
-              <button class="btn btn-secondary" onclick="verTodasReporte()">Ver todas</button>
-              <button class="btn btn-secondary" onclick="archivarAhora()">Archivar reservas vencidas</button>
               <button class="btn btn-danger" onclick="logoutAdmin()">Cerrar sesión</button>
 
-              <div id="reporte-tabla-container" style="margin-top: 20px; overflow-x: auto"></div>
+              <div id="panel-reporte">
+                <h3>📊 Reporte de reservas</h3>
+                <div class="form-group">
+                  <label for="reporte-fecha">Filtrar por fecha:</label>
+                  <input type="date" id="reporte-fecha" />
+                </div>
+                <button class="btn" onclick="filtrarReporte()">Filtrar</button>
+                <button class="btn btn-secondary" onclick="verTodasReporte()">Ver todas</button>
+                <button class="btn btn-secondary" onclick="archivarAhora()">Archivar reservas vencidas</button>
+
+                <div id="reporte-tabla-container" style="margin-top: 20px; overflow-x: auto"></div>
+              </div>
+
+              <div id="panel-config" style="display: none">
+                <h3>🕒 Turnos y horas</h3>
+                <div id="turnos-admin-container"></div>
+                <div class="form-group">
+                  <label for="nuevo-turno-nombre">Agregar turno — nombre interno (sin espacios, ej. "matutino"):</label>
+                  <input type="text" id="nuevo-turno-nombre" placeholder="ej: matutino" />
+                </div>
+                <div class="form-group">
+                  <label for="nuevo-turno-etiqueta">Nombre a mostrar:</label>
+                  <input type="text" id="nuevo-turno-etiqueta" placeholder="ej: Matutino" />
+                </div>
+                <button class="btn" onclick="agregarTurno()">Agregar turno</button>
+
+                <h3 style="margin-top: 30px">🎯 Recursos</h3>
+                <div id="recursos-admin-container"></div>
+                <div class="form-group">
+                  <label for="nuevo-recurso-nombre">Agregar recurso — nombre:</label>
+                  <input type="text" id="nuevo-recurso-nombre" placeholder="ej: Cañón" />
+                </div>
+                <div id="nuevo-recurso-turnos" class="form-group"></div>
+                <button class="btn" onclick="agregarRecurso()">Agregar recurso</button>
+              </div>
             </div>
           </div>
         </div>
