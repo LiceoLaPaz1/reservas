@@ -18,7 +18,7 @@ module.exports = async function handler(req, res) {
       res.status(200).json({ status: "ok", reservas: rows });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ status: "error", message: "Error consultando reservas", debug: String(error && error.message) });
+      res.status(500).json({ status: "error", message: "Error consultando reservas" });
     }
     return;
   }
