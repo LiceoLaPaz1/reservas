@@ -560,7 +560,19 @@ footer a:hover {
   .stats {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
-  
+
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    flex: 1 1 auto;
+    padding: 10px 8px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+
   #estado-reserva {
     top: 10px;
     right: 10px;
