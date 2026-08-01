@@ -1,6 +1,5 @@
 const { JWT } = require("google-auth-library");
 
-const HOJA = "Archivo";
 const ENCABEZADO = ["Nombre", "Apellido", "Recurso", "Fecha", "Turno", "Hora", "Cantidad de horas", "Reservado el"];
 
 function crearCliente() {
@@ -11,15 +10,16 @@ function crearCliente() {
   });
 }
 
+// Sin prefijo de nombre de hoja: apunta a la primera hoja de la planilla,
+// sin importar como se llame la pestaña ("Hoja 1", "Sheet1", etc.).
 async function tieneEncabezado(client, sheetId) {
-  const url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/" + encodeURIComponent(HOJA + "!A1");
+  const url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/A1";
   const res = await client.request({ url, method: "GET" });
   return Array.isArray(res.data.values) && res.data.values.length > 0;
 }
 
 async function agregarFilas(client, sheetId, filas) {
-  const range = encodeURIComponent(HOJA + "!A:H");
-  const url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/" + range +
+  const url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/A:H" +
     ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS";
 
   await client.request({
