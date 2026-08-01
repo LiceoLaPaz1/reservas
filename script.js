@@ -414,7 +414,21 @@ function actualizarReservas() {
   const container = document.getElementById("reservas-container");
   if (!container) return;
 
-  const reservasActivas = reservas.filter(function(r) { return !esPasado(r.fecha); });
+  const nombre = (document.getElementById("nombre") || {}).value || "";
+  const apellido = (document.getElementById("apellido") || {}).value || "";
+  const nombreNorm = nombre.trim().toLowerCase();
+  const apellidoNorm = apellido.trim().toLowerCase();
+
+  if (!nombreNorm || !apellidoNorm) {
+    container.innerHTML = '<div class="alert alert-warning">Ingresar nombre y apellido en el panel de la izquierda para ver tus reservas</div>';
+    return;
+  }
+
+  const reservasActivas = reservas.filter(function(r) {
+    return !esPasado(r.fecha) &&
+      r.nombre.trim().toLowerCase() === nombreNorm &&
+      r.apellido.trim().toLowerCase() === apellidoNorm;
+  });
 
   if (reservasActivas.length === 0) {
     container.innerHTML = '<div class="alert alert-warning">No tienes reservas activas</div>';
