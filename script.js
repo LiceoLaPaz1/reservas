@@ -89,6 +89,19 @@ function getTodosLosRecursos() {
   return Array.from(new Set([].concat(recursosMatutino, recursosVespertino)));
 }
 
+let estadoTimeoutId = null;
+function mostrarEstado(mensaje, tipo) {
+  const el = document.getElementById("estado-reserva");
+  if (!el) return;
+
+  if (estadoTimeoutId) clearTimeout(estadoTimeoutId);
+  el.textContent = mensaje;
+  el.className = "estado-" + (tipo || "info") + " show";
+  estadoTimeoutId = setTimeout(function () {
+    el.classList.remove("show");
+  }, 5000);
+}
+
 // Sincronización mejorada con manejo de errores
 async function sincronizarConServidor(maxRetries) {
   if (!maxRetries) maxRetries = 3;
@@ -159,7 +172,7 @@ console.log("Reservas normalizadas:", reservas.length);
 // Reserva simple con verificación previa
 async function realizarReserva(fecha, turno, hora, recurso) {
   if (reservaEnProgreso) {
-    alert("Ya hay una reserva en progreso. Espera un momento.");
+    mostrarEstado("Ya hay una reserva en progreso. Espera un momento.", "warning");
     return;
   }
 
@@ -171,20 +184,20 @@ async function realizarReserva(fecha, turno, hora, recurso) {
     const duracion = getDuracion();
 
     if (!nombre || !apellido) {
-      alert("Por favor ingresa nombre y apellido");
+      mostrarEstado("Por favor ingresa nombre y apellido", "warning");
       return;
     }
 
     const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
     const indiceHora = horasTurno.indexOf(hora);
-    
+
     if (indiceHora === -1) {
-      alert("Hora inválida");
+      mostrarEstado("Hora inválida", "error");
       return;
     }
-    
+
     if (indiceHora + duracion > horasTurno.length) {
-      alert("No hay suficientes horas disponibles en este turno.");
+      mostrarEstado("No hay suficientes horas disponibles en este turno.", "warning");
       return;
     }
 
@@ -205,7 +218,7 @@ async function realizarReserva(fecha, turno, hora, recurso) {
     });
 
     if (ocupado) {
-      alert("Este recurso ya está reservado en alguna de las horas seleccionadas.");
+      mostrarEstado("Este recurso ya está reservado en alguna de las horas seleccionadas.", "warning");
       return;
     }
 
@@ -255,19 +268,17 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       reservas = reservas.concat(nuevasReservas);
       localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
       
-      alert(
-        "Reserva realizada exitosamente!\n\n" +
-        "Detalles:\n" +
-        "Docente: " + nombre + " " + apellido + "\n" +
-        "Recurso: " + recurso + "\n" +
-        "Fecha: " + fecha + "\n" +
-        "Turno: " + turno + "\n" +
-        "Horas: " + horasSeleccionadas.join(", ")
+      mostrarEstado(
+        "Reserva realizada exitosamente!\n" +
+        recurso + " - " + fecha + " - " + turno + "\n" +
+        "Horas: " + horasSeleccionadas.join(", "),
+        "success"
       );
     } else {
-      alert(
+      mostrarEstado(
         "Solo se pudieron reservar " + reservasExitosas + " de " + horasSeleccionadas.length + " horas.\n" +
-        "Algunas ya estaban ocupadas por otro docente."
+        "Algunas ya estaban ocupadas por otro docente.",
+        "warning"
       );
     }
 
@@ -279,7 +290,7 @@ async function realizarReserva(fecha, turno, hora, recurso) {
 
   } catch (error) {
     console.error("Error en reserva:", error);
-    alert("Error procesando la reserva. Intenta nuevamente.");
+    mostrarEstado("Error procesando la reserva. Intenta nuevamente.", "error");
   } finally {
     reservaEnProgreso = false;
   }
@@ -323,16 +334,16 @@ async function consultarDisponibilidadServidor() {
     const horasTurno = turno === "matutino" ? horasMatutino : horasVespertino;
     const indiceHora = horasTurno.indexOf(hora);
     if (indiceHora === -1) {
-      alert("Hora inválida");
+      mostrarEstado("Hora inválida", "error");
       return;
     }
 
     const horasSeleccionadas = horasTurno.slice(indiceHora, indiceHora + duracion);
     actualizarUIConsulta(fecha, turno, hora, duracion, horasSeleccionadas);
-    
+
   } catch (error) {
     console.error("Error consultando disponibilidad:", error);
-    alert("Error consultando disponibilidad. Intenta nuevamente.");
+    mostrarEstado("Error consultando disponibilidad. Intenta nuevamente.", "error");
   } finally {
     mostrarCargando(false);
   }
@@ -377,25 +388,29 @@ function actualizarUIConsulta(fecha, turno, hora, duracion, horasSeleccionadas) 
     }
   });
 
-  recursos.forEach(function(recurso) {
+  const recursosDisponibles = recursos.filter(function(recurso) {
     const ocupado = horasSeleccionadas.some(function(hSel) {
       return reservasActivasSet.has(buildKey(fecha, turno, hSel, recurso));
     });
+    return !ocupado;
+  });
 
+  if (recursosDisponibles.length === 0) {
+    recursosGrid.innerHTML = '<div class="alert alert-warning">No hay recursos disponibles para ese horario</div>';
+    return;
+  }
+
+  recursosDisponibles.forEach(function(recurso) {
     const card = document.createElement("div");
-    card.className = "recurso-card " + (ocupado ? "ocupado" : "disponible");
-    card.innerHTML = 
+    card.className = "recurso-card disponible";
+    card.innerHTML =
       '<div class="recurso-nombre">' + recurso + '</div>' +
-      '<div class="recurso-estado ' + (ocupado ? "estado-ocupado" : "estado-disponible") + '">' +
-        (ocupado ? "Ocupado" : "Disponible") +
-      '</div>';
-    
-    if (!ocupado) {
-      card.onclick = function() { 
-        realizarReserva(fecha, turno, hora, recurso); 
-      };
-    }
-    
+      '<div class="recurso-estado estado-disponible">Disponible</div>';
+
+    card.onclick = function() {
+      realizarReserva(fecha, turno, hora, recurso);
+    };
+
     recursosGrid.appendChild(card);
   });
 }
@@ -494,7 +509,7 @@ async function cancelarReserva(id) {
   try {
     const reserva = reservas.find(function(r) { return r.id == id; });
     if (!reserva) {
-      alert("Reserva no encontrada");
+      mostrarEstado("Reserva no encontrada", "error");
       return;
     }
 
@@ -508,17 +523,17 @@ async function cancelarReserva(id) {
       reservas = reservas.filter(function(reserva) { return reserva.id != id; });
       localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
       
-      alert("Reserva cancelada exitosamente");
-      
+      mostrarEstado("Reserva cancelada exitosamente", "success");
+
       actualizarReservas();
       actualizarReportes();
       consultarDisponibilidadServidor();
     } else {
-      alert("Error cancelando reserva: " + (result.message || "Error desconocido"));
+      mostrarEstado("Error cancelando reserva: " + (result.message || "Error desconocido"), "error");
     }
   } catch (error) {
     console.error("Error cancelando reserva:", error);
-    alert("Error cancelando reserva. Intenta nuevamente.");
+    mostrarEstado("Error cancelando reserva. Intenta nuevamente.", "error");
   }
 }
 
