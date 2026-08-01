@@ -626,6 +626,26 @@ function verTodasReporte() {
   cargarReporteAdmin();
 }
 
+async function archivarAhora() {
+  const confirmacion = confirm("¿Archivar en la planilla y borrar de la base todas las reservas ya vencidas?");
+  if (!confirmacion) return;
+
+  try {
+    const response = await fetch("/api/archivar", { method: "POST" });
+    const result = await response.json();
+
+    if (response.ok && result.status === "ok") {
+      mostrarEstado("Se archivaron " + result.archivadas + " reserva(s) vencida(s).", "success");
+      cargarReporteAdmin();
+    } else {
+      mostrarEstado(result.message || "Error archivando reservas", "error");
+    }
+  } catch (error) {
+    console.error("Error archivando reservas:", error);
+    mostrarEstado("Error archivando reservas. Intenta nuevamente.", "error");
+  }
+}
+
 function renderReporteTabla(filas) {
   const container = document.getElementById("reporte-tabla-container");
   if (!container) return;

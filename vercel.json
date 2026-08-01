@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/archivar",
+      "schedule": "0 6 1 * *"
+    }
+  ]
+}
