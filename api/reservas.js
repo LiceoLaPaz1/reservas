@@ -8,7 +8,7 @@ module.exports = async function handler(req, res) {
   if (req.method === "GET") {
     try {
       const rows = await sql`
-        SELECT id, nombre, apellido, fecha, turno, hora, recurso,
+        SELECT id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
                cantidad_horas AS "cantidadHoras",
                fecha_reserva AS "fechaReserva"
         FROM reservas
@@ -35,7 +35,7 @@ module.exports = async function handler(req, res) {
       const rows = await sql`
         INSERT INTO reservas (nombre, apellido, fecha, turno, hora, recurso, cantidad_horas)
         VALUES (${nombre}, ${apellido}, ${fecha}, ${turno}, ${hora}, ${recurso}, ${cantidadHoras || 1})
-        RETURNING id, nombre, apellido, fecha, turno, hora, recurso,
+        RETURNING id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
                   cantidad_horas AS "cantidadHoras",
                   fecha_reserva AS "fechaReserva"
       `;
