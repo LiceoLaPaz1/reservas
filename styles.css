@@ -299,6 +299,33 @@ body {
   margin-bottom: 10px;
 }
 
+/* =================== Reporte administrador =================== */
+
+.tabla-reporte {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 14px;
+}
+
+.tabla-reporte th,
+.tabla-reporte td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #dee2e6;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla-reporte th {
+  background: #f8f9fa;
+  color: #495057;
+  font-weight: 600;
+}
+
+.tabla-reporte tbody tr:hover {
+  background: #f1f8ff;
+}
+
 /* =================== Reservas =================== */
 
 .reservas-list {

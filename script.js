@@ -85,10 +85,6 @@ function esPasado(fecha) {
   return fecha < hoyStr;
 }
 
-function getTodosLosRecursos() {
-  return Array.from(new Set([].concat(recursosMatutino, recursosVespertino)));
-}
-
 let estadoTimeoutId = null;
 function mostrarEstado(mensaje, tipo) {
   const el = document.getElementById("estado-reserva");
@@ -286,7 +282,6 @@ async function realizarReserva(fecha, turno, hora, recurso) {
     await sincronizarConServidor();
     consultarDisponibilidadServidor();
     actualizarReservas();
-    actualizarReportes();
 
   } catch (error) {
     console.error("Error en reserva:", error);
@@ -526,7 +521,6 @@ async function cancelarReserva(id) {
       mostrarEstado("Reserva cancelada exitosamente", "success");
 
       actualizarReservas();
-      actualizarReportes();
       consultarDisponibilidadServidor();
     } else {
       mostrarEstado("Error cancelando reserva: " + (result.message || "Error desconocido"), "error");
@@ -537,64 +531,111 @@ async function cancelarReserva(id) {
   }
 }
 
-function actualizarReportes() {
-  const reservasActivas = reservas.filter(function(r) { return !esPasado(r.fecha); });
-  const hoy = new Date().toISOString().split("T")[0];
-  const reservasHoy = reservasActivas.filter(function(r) { return r.fecha === hoy; });
+// Reporte de administrador (protegido con login)
+async function loginAdmin() {
+  const usuario = document.getElementById("admin-usuario").value.trim();
+  const contrasena = document.getElementById("admin-contrasena").value;
 
-  const totalEl = document.getElementById("total-reservas");
-  const hoyEl = document.getElementById("reservas-hoy");
-  const dispEl = document.getElementById("recursos-disponibles");
-  
-  if (totalEl) totalEl.textContent = reservasActivas.length;
-  if (hoyEl) hoyEl.textContent = reservasHoy.length;
-
-  const totalRecursos = recursosMatutino.length * horasMatutino.length + recursosVespertino.length * horasVespertino.length;
-  if (dispEl) dispEl.textContent = totalRecursos - reservasActivas.length;
-
-  const reporteRecursos = document.getElementById("reporte-recursos");
-  if (reporteRecursos) {
-    const conteoRecursos = {};
-    getTodosLosRecursos().forEach(function(recurso) {
-      conteoRecursos[recurso] = reservasActivas.filter(function(r) { return r.recurso === recurso; }).length;
-    });
-
-    reporteRecursos.innerHTML = "";
-    Object.entries(conteoRecursos).forEach(function(entry) {
-      const recurso = entry[0];
-      const cantidad = entry[1];
-      const div = document.createElement("div");
-      div.className = "reserva-item";
-      div.innerHTML = 
-        '<div class="reserva-info">' +
-          '<div class="reserva-recurso">' + recurso + '</div>' +
-          '<div class="reserva-detalles">' + cantidad + ' reservas activas</div>' +
-        '</div>';
-      reporteRecursos.appendChild(div);
-    });
+  if (!usuario || !contrasena) {
+    mostrarEstado("Ingresar usuario y contraseña", "warning");
+    return;
   }
 
-  const reporteTurnos = document.getElementById("reporte-turnos");
-  if (reporteTurnos) {
-    const conteoTurnos = {
-      matutino: reservasActivas.filter(function(r) { return r.turno === "matutino"; }).length,
-      vespertino: reservasActivas.filter(function(r) { return r.turno === "vespertino"; }).length
-    };
-
-    reporteTurnos.innerHTML = "";
-    Object.entries(conteoTurnos).forEach(function(entry) {
-      const turno = entry[0];
-      const cantidad = entry[1];
-      const div = document.createElement("div");
-      div.className = "reserva-item";
-      div.innerHTML = 
-        '<div class="reserva-info">' +
-          '<div class="reserva-recurso">Turno ' + (turno.charAt(0).toUpperCase() + turno.slice(1)) + '</div>' +
-          '<div class="reserva-detalles">' + cantidad + ' reservas activas</div>' +
-        '</div>';
-      reporteTurnos.appendChild(div);
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuario: usuario, contrasena: contrasena })
     });
+    const result = await response.json();
+
+    if (response.ok && result.status === "ok") {
+      document.getElementById("admin-contrasena").value = "";
+      await cargarReporteAdmin();
+    } else {
+      mostrarEstado(result.message || "Usuario o contraseña incorrectos", "error");
+    }
+  } catch (error) {
+    console.error("Error en login:", error);
+    mostrarEstado("Error iniciando sesión. Intenta nuevamente.", "error");
   }
+}
+
+async function logoutAdmin() {
+  try {
+    await fetch("/api/logout", { method: "POST" });
+  } catch (error) {
+    console.error("Error cerrando sesión:", error);
+  }
+  document.getElementById("login-admin").style.display = "block";
+  document.getElementById("reporte-admin").style.display = "none";
+}
+
+async function cargarReporteAdmin(fecha) {
+  try {
+    const url = fecha ? "/api/reporte?fecha=" + encodeURIComponent(fecha) : "/api/reporte";
+    const response = await fetch(url);
+
+    if (response.status === 401) {
+      document.getElementById("login-admin").style.display = "block";
+      document.getElementById("reporte-admin").style.display = "none";
+      return;
+    }
+
+    const result = await response.json();
+    if (!response.ok || result.status !== "ok") {
+      mostrarEstado(result.message || "Error consultando el reporte", "error");
+      return;
+    }
+
+    document.getElementById("login-admin").style.display = "none";
+    document.getElementById("reporte-admin").style.display = "block";
+    renderReporteTabla(result.reservas);
+  } catch (error) {
+    console.error("Error consultando el reporte:", error);
+    mostrarEstado("Error consultando el reporte. Intenta nuevamente.", "error");
+  }
+}
+
+function filtrarReporte() {
+  const fecha = document.getElementById("reporte-fecha").value;
+  cargarReporteAdmin(fecha || undefined);
+}
+
+function verTodasReporte() {
+  document.getElementById("reporte-fecha").value = "";
+  cargarReporteAdmin();
+}
+
+function renderReporteTabla(filas) {
+  const container = document.getElementById("reporte-tabla-container");
+  if (!container) return;
+
+  if (filas.length === 0) {
+    container.innerHTML = '<div class="alert alert-warning">No hay reservas para mostrar</div>';
+    return;
+  }
+
+  let html = '<table class="tabla-reporte"><thead><tr>' +
+    '<th>Docente</th><th>Recurso</th><th>Fecha</th><th>Turno</th><th>Hora</th><th>Duración</th><th>Reservado el</th>' +
+    '</tr></thead><tbody>';
+
+  filas.forEach(function (r) {
+    const fechaFormatted = new Date(r.fecha + "T00:00:00").toLocaleDateString("es-ES");
+    const fechaReservaFormatted = new Date(r.fechaReserva).toLocaleString("es-ES");
+    html += "<tr>" +
+      "<td>" + r.nombre + " " + r.apellido + "</td>" +
+      "<td>" + r.recurso + "</td>" +
+      "<td>" + fechaFormatted + "</td>" +
+      "<td>" + r.turno + "</td>" +
+      "<td>" + r.hora + "</td>" +
+      "<td>" + r.cantidadHoras + "</td>" +
+      "<td>" + fechaReservaFormatted + "</td>" +
+      "</tr>";
+  });
+
+  html += "</tbody></table>";
+  container.innerHTML = html;
 }
 
 function cambiarTab(tabName) {
@@ -618,7 +659,7 @@ function cambiarTab(tabName) {
     sincronizarConServidor().then(function() { actualizarReservas(); });
   }
   if (tabName === "reportes") {
-    sincronizarConServidor().then(function() { actualizarReportes(); });
+    cargarReporteAdmin();
   }
 }
 
@@ -667,7 +708,6 @@ document.addEventListener("DOMContentLoaded", async function() {
   }
   
   actualizarReservas();
-  actualizarReportes();
   limpiarReservasVencidas();
 });
 
@@ -684,7 +724,6 @@ setInterval(async function() {
     }
   }
   actualizarReservas();
-  actualizarReportes();
 }, 30000);
 
 // Limpiar reservas vencidas cada 5 minutos
@@ -718,8 +757,7 @@ async function forzarSincronizacion() {
   console.log("Sincronización:", exito ? "exitosa" : "falló");
   
   actualizarReservas();
-  actualizarReportes();
-  
+
   if (document.querySelector('.tab-content.active') && document.querySelector('.tab-content.active').id === 'tab-disponibilidad') {
     consultarDisponibilidadServidor();
   }

@@ -2,6 +2,7 @@
   "name": "reservas",
   "private": true,
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.0"
+    "@neondatabase/serverless": "^0.10.0",
+    "bcryptjs": "^2.4.3"
   }
 }

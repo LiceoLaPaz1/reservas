@@ -109,26 +109,31 @@
           </div>
 
           <div id="tab-reportes" class="tab-content">
-            <div class="stats">
-              <div class="stat-card">
-                <div class="stat-number" id="total-reservas">0</div>
-                <div class="stat-label">Total Reservas</div>
+            <div id="login-admin">
+              <h3>🔒 Acceso administrador</h3>
+              <div class="form-group">
+                <label for="admin-usuario">Usuario:</label>
+                <input type="text" id="admin-usuario" autocomplete="username" />
               </div>
-              <div class="stat-card">
-                <div class="stat-number" id="reservas-hoy">0</div>
-                <div class="stat-label">Reservas Hoy</div>
+              <div class="form-group">
+                <label for="admin-contrasena">Contraseña:</label>
+                <input type="password" id="admin-contrasena" autocomplete="current-password" />
               </div>
-              <div class="stat-card">
-                <div class="stat-number" id="recursos-disponibles">0</div>
-                <div class="stat-label">Recursos Disponibles</div>
-              </div>
+              <button class="btn" onclick="loginAdmin()">Ingresar</button>
             </div>
 
-            <h3>📊 Reservas por Recurso</h3>
-            <div id="reporte-recursos"></div>
+            <div id="reporte-admin" style="display: none">
+              <h3>📊 Reporte de reservas</h3>
+              <div class="form-group">
+                <label for="reporte-fecha">Filtrar por fecha:</label>
+                <input type="date" id="reporte-fecha" />
+              </div>
+              <button class="btn" onclick="filtrarReporte()">Filtrar</button>
+              <button class="btn btn-secondary" onclick="verTodasReporte()">Ver todas</button>
+              <button class="btn btn-danger" onclick="logoutAdmin()">Cerrar sesión</button>
 
-            <h3>📅 Reservas por Turno</h3>
-            <div id="reporte-turnos"></div>
+              <div id="reporte-tabla-container" style="margin-top: 20px; overflow-x: auto"></div>
+            </div>
           </div>
         </div>
       </div>
