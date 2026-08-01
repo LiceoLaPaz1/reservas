@@ -52,6 +52,11 @@ module.exports = async function handler(req, res) {
     res.status(200).json({ status: "ok", archivadas: filas.length });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ status: "error", message: "Error archivando reservas" });
+    res.status(500).json({
+      status: "error",
+      message: "Error archivando reservas",
+      debug: String(error && (error.message || error)),
+      debugData: error && error.response && error.response.data
+    });
   }
 };
