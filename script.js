@@ -111,6 +111,44 @@ function getDuracion() {
   return n;
 }
 
+function actualizarMaxDuracion() {
+  const duracionEl = document.getElementById("duracion");
+  if (!duracionEl) return;
+
+  const turno = document.getElementById("turno").value;
+  const hora = document.getElementById("hora").value;
+  const horasTurno = getHorasTurno(turno);
+  const indiceHora = horasTurno.indexOf(hora);
+
+  const maxHoras = indiceHora === -1
+    ? (horasTurno.length || 1)
+    : (horasTurno.length - indiceHora);
+
+  duracionEl.max = maxHoras || 1;
+  if (parseInt(duracionEl.value, 10) > maxHoras) {
+    duracionEl.value = maxHoras || 1;
+  }
+}
+
+function formatearFecha(fechaStr) {
+  if (!fechaStr) return "";
+  const partes = fechaStr.split("-");
+  if (partes.length !== 3) return fechaStr;
+  return partes[2] + "/" + partes[1] + "/" + partes[0].slice(-2);
+}
+
+function formatearFechaHora(fechaISO) {
+  if (!fechaISO) return "";
+  const d = new Date(fechaISO);
+  if (isNaN(d.getTime())) return fechaISO;
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const anio = String(d.getFullYear()).slice(-2);
+  const hora = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return dia + "/" + mes + "/" + anio + " " + hora + ":" + min;
+}
+
 function slotKey(reserva) {
   return reserva.fecha + "|" + reserva.turno + "|" + reserva.hora + "|" + reserva.recurso;
 }
@@ -505,7 +543,7 @@ function actualizarReservas() {
 
   container.innerHTML = "";
   reservasActivas.forEach(function(reserva) {
-    const fechaFormatted = new Date(reserva.fecha + "T00:00:00").toLocaleDateString("es-ES");
+    const fechaFormatted = formatearFecha(reserva.fecha);
     const item = document.createElement("div");
     item.className = "reserva-item";
     item.innerHTML = 
@@ -537,19 +575,13 @@ function actualizarHoras() {
     horaSelect.appendChild(option);
   });
 
-  const duracionEl = document.getElementById("duracion");
-  if (duracionEl) {
-    const maxHoras = horas.length || 1;
-    duracionEl.max = maxHoras;
-    if (parseInt(duracionEl.value, 10) > maxHoras) {
-      duracionEl.value = maxHoras;
-    }
-  }
-
+  actualizarMaxDuracion();
   consultarDisponibilidadServidor();
 }
 
 function actualizarDisponibilidad() {
+  actualizarMaxDuracion();
+
   const fecha = document.getElementById("fecha").value;
   const turno = document.getElementById("turno").value;
   const hora = document.getElementById("hora").value;
@@ -706,8 +738,8 @@ function renderReporteTabla(filas) {
     '</tr></thead><tbody>';
 
   filas.forEach(function (r) {
-    const fechaFormatted = new Date(r.fecha + "T00:00:00").toLocaleDateString("es-ES");
-    const fechaReservaFormatted = new Date(r.fechaReserva).toLocaleString("es-ES");
+    const fechaFormatted = formatearFecha(r.fecha);
+    const fechaReservaFormatted = formatearFechaHora(r.fechaReserva);
     html += "<tr>" +
       "<td>" + r.nombre + " " + r.apellido + "</td>" +
       "<td>" + r.recurso + "</td>" +
