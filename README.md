@@ -126,7 +126,10 @@ siempre.
 ## Uso diario (una vez instalada)
 
 - **Docentes/usuarios**: no necesitan cuenta. Escriben su nombre y
-  apellido, eligen fecha/turno/hora, y reservan un recurso disponible.
+  apellido, eligen fecha/turno/hora, y reservan un recurso disponible. El
+  formulario no deja elegir fechas ni horas ya pasadas, y limita la
+  cantidad de horas de duración al máximo real disponible según la hora
+  elegida.
 - **Administrador**: entra a la pestaña "Reportes" con el usuario/
   contraseña del paso 4. Ahí puede:
   - Ver el reporte de todas las reservas (quién, qué, cuándo), filtrable
