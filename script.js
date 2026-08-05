@@ -1102,6 +1102,8 @@ function limpiarReservasVencidas() {
 }
 
 function limpiarSeleccion() {
+  const nombreEl = document.getElementById("nombre");
+  const apellidoEl = document.getElementById("apellido");
   const turnoEl = document.getElementById("turno");
   const horaEl = document.getElementById("hora");
   const durEl = document.getElementById("duracion");
@@ -1111,6 +1113,8 @@ function limpiarSeleccion() {
   const detalles = document.getElementById("detalles-consulta");
   const grid = document.getElementById("recursos-grid");
 
+  if (nombreEl) nombreEl.value = "";
+  if (apellidoEl) apellidoEl.value = "";
   if (turnoEl) turnoEl.value = "";
   if (horaEl) horaEl.innerHTML = '<option value="">Seleccionar hora</option>';
   if (durEl) durEl.value = 1;
