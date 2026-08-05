@@ -1,6 +1,7 @@
 const { sql } = require("./_db");
 const { verificarSesion } = require("./_auth");
 const { archivarEnSheet } = require("./_sheets");
+const { fechaActual } = require("./_fecha");
 
 function autorizado(req) {
   const auth = req.headers.authorization || "";
@@ -8,10 +9,6 @@ function autorizado(req) {
     return true;
   }
   return verificarSesion(req);
-}
-
-function hoyISO() {
-  return new Date().toISOString().split("T")[0];
 }
 
 module.exports = async function handler(req, res) {
@@ -31,7 +28,7 @@ module.exports = async function handler(req, res) {
              cantidad_horas AS "cantidadHoras",
              fecha_reserva AS "fechaReserva"
       FROM reservas
-      WHERE fecha < ${hoyISO()}
+      WHERE fecha < ${fechaActual()}
       ORDER BY fecha, hora
     `;
 

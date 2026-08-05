@@ -1,8 +1,5 @@
 const { sql } = require("./_db");
-
-function hoyISO() {
-  return new Date().toISOString().split("T")[0];
-}
+const { fechaActual, horaActual } = require("./_fecha");
 
 module.exports = async function handler(req, res) {
   if (req.method === "GET") {
@@ -12,7 +9,7 @@ module.exports = async function handler(req, res) {
                cantidad_horas AS "cantidadHoras",
                fecha_reserva AS "fechaReserva"
         FROM reservas
-        WHERE fecha >= ${hoyISO()}
+        WHERE fecha >= ${fechaActual()}
         ORDER BY fecha, hora
       `;
       res.status(200).json({ status: "ok", reservas: rows });
@@ -32,9 +29,25 @@ module.exports = async function handler(req, res) {
         return;
       }
 
-      if (fecha < hoyISO()) {
+      const hoy = fechaActual();
+
+      if (fecha < hoy) {
         res.status(400).json({ status: "error", message: "No se pueden reservar fechas pasadas" });
         return;
+      }
+
+      if (fecha === hoy) {
+        const filasHora = await sql`
+          SELECT to_char(h.hora_inicio, 'HH24:MI') AS "horaInicio"
+          FROM horas h
+          JOIN turnos t ON t.id = h.turno_id
+          WHERE t.nombre = ${turno} AND h.etiqueta = ${hora}
+        `;
+        const horaInicio = filasHora[0] && filasHora[0].horaInicio;
+        if (horaInicio && horaInicio <= horaActual()) {
+          res.status(400).json({ status: "error", message: "Esa hora ya pasó" });
+          return;
+        }
       }
 
       const rows = await sql`

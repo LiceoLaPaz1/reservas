@@ -58,6 +58,20 @@ function getRecursosTurno(turnoNombre) {
     .map(function (r) { return r.nombre; });
 }
 
+function horaYaPaso(turnoNombre, horaEtiqueta, fecha) {
+  const ahora = new Date();
+  const hoyStr = ahora.getFullYear() + "-" + String(ahora.getMonth() + 1).padStart(2, "0") + "-" + String(ahora.getDate()).padStart(2, "0");
+  if (fecha !== hoyStr) return false;
+
+  const turno = turnosData.find(function (t) { return t.nombre === turnoNombre; });
+  if (!turno) return false;
+  const horaObj = turno.horas.find(function (h) { return h.etiqueta === horaEtiqueta; });
+  if (!horaObj || !horaObj.horaInicio) return false;
+
+  const horaActualStr = String(ahora.getHours()).padStart(2, "0") + ":" + String(ahora.getMinutes()).padStart(2, "0");
+  return horaActualStr >= horaObj.horaInicio;
+}
+
 function normalizarFecha(fechaServidor) {
   if (!fechaServidor) return null;
   
@@ -266,6 +280,11 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       return;
     }
 
+    if (horaYaPaso(turno, hora, fecha)) {
+      mostrarEstado("Esa hora ya pasó", "warning");
+      return;
+    }
+
     const horasTurno = getHorasTurno(turno);
     const indiceHora = horasTurno.indexOf(hora);
 
@@ -422,6 +441,11 @@ async function consultarDisponibilidadServidor() {
 
   if (!fecha || !turno || !hora) return;
 
+  if (horaYaPaso(turno, hora, fecha)) {
+    mostrarEstado("Esa hora ya pasó", "warning");
+    return;
+  }
+
   mostrarCargando(true);
 
   try {
@@ -566,12 +590,15 @@ function actualizarReservas() {
 
 function actualizarHoras() {
   const turno = document.getElementById("turno").value;
+  const fecha = document.getElementById("fecha").value;
   const horaSelect = document.getElementById("hora");
   if (!horaSelect) return;
 
   horaSelect.innerHTML = '<option value="">Seleccionar hora</option>';
 
-  const horas = getHorasTurno(turno);
+  const horas = getHorasTurno(turno).filter(function (hora) {
+    return !horaYaPaso(turno, hora, fecha);
+  });
 
   horas.forEach(function(hora) {
     const option = document.createElement("option");
@@ -795,11 +822,15 @@ function renderTurnosAdmin() {
   let html = "";
   turnosData.forEach(function (t) {
     const horasOrdenadas = t.horas.slice().sort(function (a, b) { return a.orden - b.orden; });
-    const chips = horasOrdenadas.map(function (h) {
-      return '<span style="display:inline-flex;align-items:center;gap:4px;background:#e9ecef;border-radius:12px;padding:3px 10px;margin:3px;">' +
-        h.etiqueta +
-        '<button onclick="eliminarHora(' + h.id + ')" title="Eliminar hora" style="border:none;background:none;color:#dc3545;cursor:pointer;font-weight:bold;">×</button>' +
-        '</span>';
+    const filas = horasOrdenadas.map(function (h) {
+      return '<div style="display:flex;align-items:center;gap:6px;margin:4px 0;">' +
+        '<span style="min-width:60px;">' + h.etiqueta + '</span>' +
+        '<input type="time" id="hora-inicio-' + h.id + '" value="' + (h.horaInicio || "") + '" style="padding:4px;border:1px solid #dee2e6;border-radius:4px;" />' +
+        '<span>a</span>' +
+        '<input type="time" id="hora-fin-' + h.id + '" value="' + (h.horaFin || "") + '" style="padding:4px;border:1px solid #dee2e6;border-radius:4px;" />' +
+        '<button class="btn btn-secondary" style="width:auto;padding:4px 10px;" onclick="guardarHorarioHora(' + h.id + ')">Guardar</button>' +
+        '<button onclick="eliminarHora(' + h.id + ')" title="Eliminar hora" style="border:none;background:none;color:#dc3545;cursor:pointer;font-weight:bold;font-size:16px;">×</button>' +
+        '</div>';
     }).join("");
 
     html += '<div class="reserva-item" style="flex-direction:column;align-items:stretch;">' +
@@ -807,15 +838,44 @@ function renderTurnosAdmin() {
       '<strong>' + t.etiqueta + '</strong>&nbsp;<span style="color:#6c757d;font-size:13px;">(' + t.nombre + ')</span>' +
       '<button class="btn-cancelar" onclick="eliminarTurno(' + t.id + ')">Eliminar turno</button>' +
       '</div>' +
-      '<div style="margin-top:8px;">' + (chips || '<em>sin horas</em>') + '</div>' +
-      '<div style="display:flex;gap:8px;margin-top:8px;">' +
-      '<input type="text" id="nueva-hora-' + t.id + '" placeholder="Nueva hora (ej: 9na)" style="flex:1;padding:8px;border:1px solid #dee2e6;border-radius:6px;" />' +
+      '<div style="margin-top:8px;">' + (filas || '<em>sin horas</em>') + '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">' +
+      '<input type="text" id="nueva-hora-' + t.id + '" placeholder="Etiqueta (ej: 9na)" style="flex:1;min-width:100px;padding:8px;border:1px solid #dee2e6;border-radius:6px;" />' +
+      '<input type="time" id="nueva-hora-inicio-' + t.id + '" style="padding:8px;border:1px solid #dee2e6;border-radius:6px;" />' +
+      '<span>a</span>' +
+      '<input type="time" id="nueva-hora-fin-' + t.id + '" style="padding:8px;border:1px solid #dee2e6;border-radius:6px;" />' +
       '<button class="btn btn-secondary" style="width:auto;" onclick="agregarHora(' + t.id + ')">+ Hora</button>' +
       '</div>' +
       '</div>';
   });
 
   container.innerHTML = html;
+}
+
+async function guardarHorarioHora(id) {
+  const inicioEl = document.getElementById("hora-inicio-" + id);
+  const finEl = document.getElementById("hora-fin-" + id);
+  const horaInicio = inicioEl ? inicioEl.value : "";
+  const horaFin = finEl ? finEl.value : "";
+
+  try {
+    const response = await fetch("/api/horas/" + id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ horaInicio: horaInicio || null, horaFin: horaFin || null })
+    });
+    const result = await response.json();
+
+    if (response.ok && result.status === "ok") {
+      mostrarEstado("Horario guardado", "success");
+      await cargarAdminConfig();
+    } else {
+      mostrarEstado(result.message || "Error guardando el horario", "error");
+    }
+  } catch (error) {
+    console.error("Error guardando horario:", error);
+    mostrarEstado("Error guardando el horario. Intenta nuevamente.", "error");
+  }
 }
 
 async function agregarTurno() {
@@ -872,6 +932,8 @@ async function eliminarTurno(id) {
 async function agregarHora(turnoId) {
   const input = document.getElementById("nueva-hora-" + turnoId);
   const etiqueta = input ? input.value.trim() : "";
+  const inicioEl = document.getElementById("nueva-hora-inicio-" + turnoId);
+  const finEl = document.getElementById("nueva-hora-fin-" + turnoId);
 
   if (!etiqueta) {
     mostrarEstado("Escribir la etiqueta de la hora", "warning");
@@ -882,7 +944,11 @@ async function agregarHora(turnoId) {
     const response = await fetch("/api/turnos/" + turnoId + "/horas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ etiqueta: etiqueta })
+      body: JSON.stringify({
+        etiqueta: etiqueta,
+        horaInicio: inicioEl && inicioEl.value ? inicioEl.value : null,
+        horaFin: finEl && finEl.value ? finEl.value : null
+      })
     });
     const result = await response.json();
 

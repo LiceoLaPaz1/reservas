@@ -33,8 +33,15 @@ CREATE TABLE IF NOT EXISTS horas (
   turno_id BIGINT NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
   etiqueta TEXT NOT NULL,
   orden INT NOT NULL DEFAULT 0,
+  hora_inicio TIME,
+  hora_fin TIME,
   UNIQUE (turno_id, etiqueta)
 );
+
+-- Por si la tabla ya existia de una instalacion previa a que se agregara
+-- el horario real de cada hora.
+ALTER TABLE horas ADD COLUMN IF NOT EXISTS hora_inicio TIME;
+ALTER TABLE horas ADD COLUMN IF NOT EXISTS hora_fin TIME;
 
 CREATE TABLE IF NOT EXISTS recursos (
   id BIGSERIAL PRIMARY KEY,
@@ -86,3 +93,28 @@ FROM recursos r
 JOIN turnos t ON t.nombre = 'vespertino'
 WHERE r.nombre IN ('Sala de Informática', 'Salón 10')
 ON CONFLICT DO NOTHING;
+
+-- Horario real de cada hora (para no dejar reservar, en el dia de hoy,
+-- una hora que ya empezo). Se puede editar despues desde el panel de
+-- administrador si cambia el horario de la institucion.
+UPDATE horas h SET hora_inicio = v.inicio, hora_fin = v.fin
+FROM turnos t
+JOIN (VALUES
+  ('matutino', '1era', TIME '07:30', TIME '08:10'),
+  ('matutino', '2da', TIME '08:10', TIME '08:55'),
+  ('matutino', '3era', TIME '09:00', TIME '09:45'),
+  ('matutino', '4ta', TIME '09:50', TIME '10:35'),
+  ('matutino', '5ta', TIME '10:45', TIME '11:30'),
+  ('matutino', '6ta', TIME '11:35', TIME '12:10'),
+  ('matutino', '7ma', TIME '12:15', TIME '12:55'),
+  ('matutino', '8va', TIME '12:55', TIME '13:40'),
+  ('vespertino', '0', TIME '13:00', TIME '13:45'),
+  ('vespertino', '1era', TIME '13:50', TIME '14:30'),
+  ('vespertino', '2da', TIME '14:30', TIME '15:10'),
+  ('vespertino', '3era', TIME '15:15', TIME '16:00'),
+  ('vespertino', '4ta', TIME '16:05', TIME '16:50'),
+  ('vespertino', '5ta', TIME '17:00', TIME '17:45'),
+  ('vespertino', '6ta', TIME '17:50', TIME '18:35'),
+  ('vespertino', '7ma', TIME '18:40', TIME '19:25')
+) AS v(turno_nombre, etiqueta, inicio, fin) ON v.turno_nombre = t.nombre
+WHERE h.turno_id = t.id AND h.etiqueta = v.etiqueta;

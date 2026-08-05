@@ -5,7 +5,13 @@ module.exports = async function handler(req, res) {
   if (req.method === "GET") {
     try {
       const turnos = await sql`SELECT id, nombre, etiqueta, orden FROM turnos ORDER BY orden, id`;
-      const horas = await sql`SELECT id, turno_id AS "turnoId", etiqueta, orden FROM horas ORDER BY orden, id`;
+      const horas = await sql`
+        SELECT id, turno_id AS "turnoId", etiqueta, orden,
+               to_char(hora_inicio, 'HH24:MI') AS "horaInicio",
+               to_char(hora_fin, 'HH24:MI') AS "horaFin"
+        FROM horas
+        ORDER BY orden, id
+      `;
 
       const resultado = turnos.map(function (t) {
         return {

@@ -15,16 +15,18 @@ module.exports = async function handler(req, res) {
   const { id } = req.query;
 
   try {
-    const { etiqueta, orden } = req.body || {};
+    const { etiqueta, orden, horaInicio, horaFin } = req.body || {};
     if (!etiqueta) {
       res.status(400).json({ status: "error", message: "Falta la etiqueta de la hora" });
       return;
     }
 
     const rows = await sql`
-      INSERT INTO horas (turno_id, etiqueta, orden)
-      VALUES (${id}, ${etiqueta}, ${orden || 0})
-      RETURNING id, turno_id AS "turnoId", etiqueta, orden
+      INSERT INTO horas (turno_id, etiqueta, orden, hora_inicio, hora_fin)
+      VALUES (${id}, ${etiqueta}, ${orden || 0}, ${horaInicio || null}, ${horaFin || null})
+      RETURNING id, turno_id AS "turnoId", etiqueta, orden,
+                to_char(hora_inicio, 'HH24:MI') AS "horaInicio",
+                to_char(hora_fin, 'HH24:MI') AS "horaFin"
     `;
     res.status(201).json({ status: "success", hora: rows[0] });
   } catch (error) {
