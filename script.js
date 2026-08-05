@@ -261,6 +261,11 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       return;
     }
 
+    if (esPasado(fecha)) {
+      mostrarEstado("No se pueden reservar fechas pasadas", "warning");
+      return;
+    }
+
     const horasTurno = getHorasTurno(turno);
     const indiceHora = horasTurno.indexOf(hora);
 
@@ -1054,7 +1059,10 @@ function limpiarSeleccion() {
 document.addEventListener("DOMContentLoaded", async function() {
   const hoy = new Date().toISOString().split("T")[0];
   const fechaEl = document.getElementById("fecha");
-  if (fechaEl) fechaEl.value = hoy;
+  if (fechaEl) {
+    fechaEl.value = hoy;
+    fechaEl.min = hoy;
+  }
 
   console.log("Iniciando sistema - Session ID:", sessionId);
   console.log("Endpoint:", endpoint);

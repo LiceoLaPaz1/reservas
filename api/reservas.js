@@ -32,6 +32,11 @@ module.exports = async function handler(req, res) {
         return;
       }
 
+      if (fecha < hoyISO()) {
+        res.status(400).json({ status: "error", message: "No se pueden reservar fechas pasadas" });
+        return;
+      }
+
       const rows = await sql`
         INSERT INTO reservas (nombre, apellido, fecha, turno, hora, recurso, cantidad_horas)
         VALUES (${nombre}, ${apellido}, ${fecha}, ${turno}, ${hora}, ${recurso}, ${cantidadHoras || 1})
