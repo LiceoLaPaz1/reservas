@@ -104,7 +104,11 @@ function generateSessionId() {
 function getDuracion() {
   const el = document.getElementById("duracion");
   const n = el ? parseInt(el.value, 10) : 1;
-  return Number.isFinite(n) && n > 0 ? n : 1;
+  const max = el && el.max ? parseInt(el.max, 10) : null;
+
+  if (!Number.isFinite(n) || n < 1) return 1;
+  if (Number.isFinite(max) && n > max) return max;
+  return n;
 }
 
 function slotKey(reserva) {
@@ -532,6 +536,15 @@ function actualizarHoras() {
     option.textContent = hora;
     horaSelect.appendChild(option);
   });
+
+  const duracionEl = document.getElementById("duracion");
+  if (duracionEl) {
+    const maxHoras = horas.length || 1;
+    duracionEl.max = maxHoras;
+    if (parseInt(duracionEl.value, 10) > maxHoras) {
+      duracionEl.value = maxHoras;
+    }
+  }
 
   consultarDisponibilidadServidor();
 }
