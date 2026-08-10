@@ -1,5 +1,8 @@
 # Gestor de Reservas de Recursos
 
+🔗 En vivo (Liceo La Paz 1): https://reservas-sand.vercel.app/
+📁 La planilla con las reservas archivadas está en el Drive de POITES.
+
 Aplicación web para reservar recursos compartidos de una institución (cañón,
 TVs, salas, etc.) por fecha, turno y hora, con panel de administrador para
 ver quién reservó qué y para dar de alta/baja los turnos, horas y recursos
