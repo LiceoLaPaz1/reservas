@@ -14,35 +14,41 @@ function parseCookies(header) {
   return cookies;
 }
 
-function firmar(expiracion) {
-  return crypto.createHmac("sha256", process.env.SESSION_SECRET).update(String(expiracion)).digest("hex");
+const ROLES_VALIDOS = ["admin", "lector"];
+
+function firmar(payload) {
+  return crypto.createHmac("sha256", process.env.SESSION_SECRET).update(payload).digest("hex");
 }
 
-function crearTokenSesion() {
+function crearTokenSesion(rol) {
   const expiracion = Date.now() + SESSION_DURATION_MS;
-  return expiracion + "." + firmar(expiracion);
+  const payload = expiracion + "." + rol;
+  return payload + "." + firmar(payload);
 }
 
+// Devuelve el rol de la sesión ("admin" | "lector") o false si no hay sesión válida.
 function verificarSesion(req) {
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies.session;
   if (!token) return false;
 
-  const puntoIdx = token.indexOf(".");
-  if (puntoIdx === -1) return false;
+  const partes = token.split(".");
+  if (partes.length !== 3) return false;
 
-  const expStr = token.slice(0, puntoIdx);
-  const firma = token.slice(puntoIdx + 1);
+  const [expStr, rol, firma] = partes;
   const expiracion = parseInt(expStr, 10);
 
   if (!expiracion || Date.now() > expiracion) return false;
+  if (ROLES_VALIDOS.indexOf(rol) === -1) return false;
 
-  const esperada = firmar(expiracion);
+  const payload = expStr + "." + rol;
+  const esperada = firmar(payload);
   const bufA = Buffer.from(firma);
   const bufB = Buffer.from(esperada);
   if (bufA.length !== bufB.length) return false;
+  if (!crypto.timingSafeEqual(bufA, bufB)) return false;
 
-  return crypto.timingSafeEqual(bufA, bufB);
+  return rol;
 }
 
 function cookieSesion(token) {

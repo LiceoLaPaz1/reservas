@@ -8,7 +8,7 @@ function autorizado(req) {
   if (process.env.CRON_SECRET && auth === "Bearer " + process.env.CRON_SECRET) {
     return true;
   }
-  return verificarSesion(req);
+  return verificarSesion(req) === "admin";
 }
 
 module.exports = async function handler(req, res) {

@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!verificarSesion(req)) {
+  if (verificarSesion(req) !== "admin") {
     res.status(401).json({ status: "error", message: "No autorizado" });
     return;
   }

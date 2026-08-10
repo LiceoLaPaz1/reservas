@@ -9,6 +9,7 @@ let reservas = [];
 let reservaEnProgreso = false;
 let ultimaSincronizacion = 0;
 let sessionId = generateSessionId();
+let rolAdmin = null; // "admin" | "lector" | null (sin sesión)
 
 // Turnos, horas y recursos: se cargan desde la base (administrables desde el panel)
 let turnosData = [];
@@ -696,6 +697,7 @@ async function logoutAdmin() {
   } catch (error) {
     console.error("Error cerrando sesión:", error);
   }
+  rolAdmin = null;
   document.getElementById("login-admin").style.display = "block";
   document.getElementById("reporte-admin").style.display = "none";
 }
@@ -706,6 +708,7 @@ async function cargarReporteAdmin(fecha) {
     const response = await fetch(url);
 
     if (response.status === 401) {
+      rolAdmin = null;
       document.getElementById("login-admin").style.display = "block";
       document.getElementById("reporte-admin").style.display = "none";
       return;
@@ -717,12 +720,31 @@ async function cargarReporteAdmin(fecha) {
       return;
     }
 
+    rolAdmin = result.rol || null;
+    aplicarPermisosAdmin();
+
     document.getElementById("login-admin").style.display = "none";
     document.getElementById("reporte-admin").style.display = "block";
     renderReporteTabla(result.reservas);
   } catch (error) {
     console.error("Error consultando el reporte:", error);
     mostrarEstado("Error consultando el reporte. Intenta nuevamente.", "error");
+  }
+}
+
+// Oculta las funciones exclusivas de administrador ("Recursos y turnos",
+// archivar) cuando la sesión es de rol "lector" (solo lectura de reportes).
+function aplicarPermisosAdmin() {
+  const esAdmin = rolAdmin === "admin";
+
+  const tabConfigBtn = document.getElementById("tab-config-btn");
+  if (tabConfigBtn) tabConfigBtn.style.display = esAdmin ? "" : "none";
+
+  const btnArchivar = document.getElementById("btn-archivar");
+  if (btnArchivar) btnArchivar.style.display = esAdmin ? "" : "none";
+
+  if (!esAdmin) {
+    mostrarPanelAdmin("reporte");
   }
 }
 
@@ -789,6 +811,10 @@ function renderReporteTabla(filas) {
 
 // Administración de turnos, horas y recursos (panel admin)
 function mostrarPanelAdmin(nombre) {
+  if (nombre === "config" && rolAdmin !== "admin") {
+    nombre = "reporte";
+  }
+
   const panelReporte = document.getElementById("panel-reporte");
   const panelConfig = document.getElementById("panel-config");
   if (panelReporte) panelReporte.style.display = nombre === "reporte" ? "block" : "none";

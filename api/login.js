@@ -15,20 +15,24 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    if (usuario !== process.env.ADMIN_USER) {
+    let rol = null;
+
+    if (usuario === process.env.ADMIN_USER) {
+      const valida = await bcrypt.compare(contrasena, process.env.ADMIN_PASSWORD_HASH || "");
+      if (valida) rol = "admin";
+    } else if (usuario === process.env.LECTOR_USER) {
+      const valida = await bcrypt.compare(contrasena, process.env.LECTOR_PASSWORD_HASH || "");
+      if (valida) rol = "lector";
+    }
+
+    if (!rol) {
       res.status(401).json({ status: "error", message: "Usuario o contraseña incorrectos" });
       return;
     }
 
-    const valida = await bcrypt.compare(contrasena, process.env.ADMIN_PASSWORD_HASH || "");
-    if (!valida) {
-      res.status(401).json({ status: "error", message: "Usuario o contraseña incorrectos" });
-      return;
-    }
-
-    const token = crearTokenSesion();
+    const token = crearTokenSesion(rol);
     res.setHeader("Set-Cookie", cookieSesion(token));
-    res.status(200).json({ status: "ok" });
+    res.status(200).json({ status: "ok", rol: rol });
   } catch (error) {
     console.error(error);
     res.status(500).json({ status: "error", message: "Error iniciando sesión" });

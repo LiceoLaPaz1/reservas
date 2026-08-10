@@ -15,8 +15,9 @@ las demás (no es un sistema compartido entre varias instituciones).
 - Backend: funciones serverless de Vercel bajo `/api` (un archivo = un
   endpoint), sin framework.
 - Base de datos: Postgres en [Neon](https://neon.tech) (plan free alcanza).
-- Login de administrador: una única cuenta compartida, sesión por cookie
-  firmada — sin base de datos de usuarios.
+- Login: dos roles con cuenta compartida (una para administrador, otra
+  opcional de solo lectura), sesión por cookie firmada — sin base de datos
+  de usuarios.
 - Archivado automático (opcional): las reservas vencidas se guardan en una
   planilla de Google Sheets antes de borrarse de la base, para no perder el
   historial ni superar el límite de espacio del plan free de Neon.
@@ -66,6 +67,20 @@ Esto imprime 4 líneas — `ADMIN_USER`, `ADMIN_PASSWORD_HASH`,
 `SESSION_SECRET` y `CRON_SECRET`. Guardalas, las necesitás en el paso
 siguiente.
 
+**Opcional — usuario de solo lectura ("lector"):** para dar acceso a
+adscriptos u otro personal que solo necesite consultar y filtrar el
+reporte de reservas (quién reservó qué y cuándo), sin poder editar
+turnos/horas/recursos ni archivar reservas, generar credenciales aparte:
+
+```bash
+node scripts/generar-credenciales.js <usuario> <contraseña> lector
+```
+
+Esto imprime `LECTOR_USER` y `LECTOR_PASSWORD_HASH` — se cargan en Vercel
+junto con las del admin (no reemplazan nada, son variables nuevas). No
+generan un `SESSION_SECRET` propio: usan el mismo que ya está configurado
+para el admin.
+
 ### 5. Cargar las variables de entorno en Vercel
 
 En el proyecto de Vercel: **Settings → Environment Variables** (marcar
@@ -77,6 +92,8 @@ Production), agregar:
 | `ADMIN_PASSWORD_HASH` | el hash que imprimió el script |
 | `SESSION_SECRET` | el valor que imprimió el script |
 | `CRON_SECRET` | el valor que imprimió el script (solo hace falta si vas a usar el archivado automático del paso 7) |
+| `LECTOR_USER` | (opcional) el usuario de solo lectura, si generaste uno |
+| `LECTOR_PASSWORD_HASH` | (opcional) el hash correspondiente |
 
 Después de guardarlas, ir a **Deployments** → abrir el último deployment →
 **Redeploy** (las variables de entorno nuevas no aplican a deployments ya
@@ -139,6 +156,10 @@ siempre.
     horas dentro de cada turno, agregar/eliminar recursos y elegir en
     qué turnos está disponible cada uno — todo sin tocar código ni
     redeployar.
+- **Lector** (opcional, ver paso 4): entra a la pestaña "Reportes" con su
+  propio usuario/contraseña. Puede ver y filtrar el reporte de reservas,
+  igual que el administrador, pero no ve la pestaña "Recursos y turnos"
+  ni el botón de archivar — solo consulta.
 
 ## Licencia
 

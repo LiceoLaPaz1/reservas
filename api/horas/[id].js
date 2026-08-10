@@ -2,7 +2,7 @@ const { sql } = require("../_db");
 const { verificarSesion } = require("../_auth");
 
 module.exports = async function handler(req, res) {
-  if (!verificarSesion(req)) {
+  if (verificarSesion(req) !== "admin") {
     res.status(401).json({ status: "error", message: "No autorizado" });
     return;
   }

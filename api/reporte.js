@@ -7,7 +7,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!verificarSesion(req)) {
+  const rol = verificarSesion(req);
+  if (!rol) {
     res.status(401).json({ status: "error", message: "No autorizado" });
     return;
   }
@@ -32,7 +33,7 @@ module.exports = async function handler(req, res) {
           ORDER BY fecha DESC, hora
         `;
 
-    res.status(200).json({ status: "ok", reservas: rows });
+    res.status(200).json({ status: "ok", reservas: rows, rol: rol });
   } catch (error) {
     console.error(error);
     res.status(500).json({ status: "error", message: "Error consultando el reporte" });
