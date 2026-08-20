@@ -702,9 +702,13 @@ async function logoutAdmin() {
   document.getElementById("reporte-admin").style.display = "none";
 }
 
-async function cargarReporteAdmin(fecha) {
+async function cargarReporteAdmin(fecha, docente) {
   try {
-    const url = fecha ? "/api/reporte?fecha=" + encodeURIComponent(fecha) : "/api/reporte";
+    const params = new URLSearchParams();
+    if (fecha) params.set("fecha", fecha);
+    if (docente) params.set("docente", docente);
+    const query = params.toString();
+    const url = query ? "/api/reporte?" + query : "/api/reporte";
     const response = await fetch(url);
 
     if (response.status === 401) {
@@ -750,11 +754,13 @@ function aplicarPermisosAdmin() {
 
 function filtrarReporte() {
   const fecha = document.getElementById("reporte-fecha").value;
-  cargarReporteAdmin(fecha || undefined);
+  const docente = document.getElementById("reporte-docente").value;
+  cargarReporteAdmin(fecha || undefined, docente || undefined);
 }
 
 function verTodasReporte() {
   document.getElementById("reporte-fecha").value = "";
+  document.getElementById("reporte-docente").value = "";
   cargarReporteAdmin();
 }
 
@@ -782,6 +788,8 @@ function renderReporteTabla(filas) {
   const container = document.getElementById("reporte-tabla-container");
   if (!container) return;
 
+  const esAdmin = rolAdmin === "admin";
+
   if (filas.length === 0) {
     container.innerHTML = '<div class="alert alert-warning">No hay reservas para mostrar</div>';
     return;
@@ -789,6 +797,7 @@ function renderReporteTabla(filas) {
 
   let html = '<table class="tabla-reporte"><thead><tr>' +
     '<th>Docente</th><th>Recurso</th><th>Fecha</th><th>Turno</th><th>Hora</th><th>Duración</th><th>Reservado el</th>' +
+    (esAdmin ? "<th></th>" : "") +
     '</tr></thead><tbody>';
 
   filas.forEach(function (r) {
@@ -802,11 +811,34 @@ function renderReporteTabla(filas) {
       "<td>" + r.hora + "</td>" +
       "<td>" + r.cantidadHoras + "</td>" +
       "<td>" + fechaReservaFormatted + "</td>" +
+      (esAdmin ? '<td><button class="btn-cancelar" onclick="borrarReservaAdmin(' + r.id + ')">Borrar</button></td>' : "") +
       "</tr>";
   });
 
   html += "</tbody></table>";
   container.innerHTML = html;
+}
+
+async function borrarReservaAdmin(id) {
+  const confirmacion = confirm("¿Borrar esta reserva? Esta acción no se puede deshacer.");
+  if (!confirmacion) return;
+
+  try {
+    const response = await fetch("/api/reservas/" + id, { method: "DELETE" });
+    const result = await response.json();
+
+    if (response.ok && result.status === "ok") {
+      mostrarEstado("Reserva borrada", "success");
+      const fecha = document.getElementById("reporte-fecha").value;
+      const docente = document.getElementById("reporte-docente").value;
+      cargarReporteAdmin(fecha || undefined, docente || undefined);
+    } else {
+      mostrarEstado(result.message || "Error borrando la reserva", "error");
+    }
+  } catch (error) {
+    console.error("Error borrando reserva:", error);
+    mostrarEstado("Error borrando la reserva. Intenta nuevamente.", "error");
+  }
 }
 
 // Administración de turnos, horas y recursos (panel admin)

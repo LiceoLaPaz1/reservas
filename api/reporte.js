@@ -15,23 +15,46 @@ module.exports = async function handler(req, res) {
 
   try {
     const fecha = req.query && req.query.fecha;
+    const docente = req.query && req.query.docente && req.query.docente.trim();
+    const docenteLike = docente ? "%" + docente + "%" : null;
 
-    const rows = fecha
-      ? await sql`
-          SELECT id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
-                 cantidad_horas AS "cantidadHoras",
-                 fecha_reserva AS "fechaReserva"
-          FROM reservas
-          WHERE fecha = ${fecha}
-          ORDER BY hora
-        `
-      : await sql`
-          SELECT id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
-                 cantidad_horas AS "cantidadHoras",
-                 fecha_reserva AS "fechaReserva"
-          FROM reservas
-          ORDER BY fecha DESC, hora
-        `;
+    let rows;
+    if (fecha && docenteLike) {
+      rows = await sql`
+        SELECT id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
+               cantidad_horas AS "cantidadHoras",
+               fecha_reserva AS "fechaReserva"
+        FROM reservas
+        WHERE fecha = ${fecha} AND (nombre || ' ' || apellido) ILIKE ${docenteLike}
+        ORDER BY hora
+      `;
+    } else if (fecha) {
+      rows = await sql`
+        SELECT id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
+               cantidad_horas AS "cantidadHoras",
+               fecha_reserva AS "fechaReserva"
+        FROM reservas
+        WHERE fecha = ${fecha}
+        ORDER BY hora
+      `;
+    } else if (docenteLike) {
+      rows = await sql`
+        SELECT id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
+               cantidad_horas AS "cantidadHoras",
+               fecha_reserva AS "fechaReserva"
+        FROM reservas
+        WHERE (nombre || ' ' || apellido) ILIKE ${docenteLike}
+        ORDER BY fecha DESC, hora
+      `;
+    } else {
+      rows = await sql`
+        SELECT id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
+               cantidad_horas AS "cantidadHoras",
+               fecha_reserva AS "fechaReserva"
+        FROM reservas
+        ORDER BY fecha DESC, hora
+      `;
+    }
 
     res.status(200).json({ status: "ok", reservas: rows, rol: rol });
   } catch (error) {
