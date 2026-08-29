@@ -149,20 +149,23 @@ siempre.
   apellido, eligen fecha/turno/hora, y reservan un recurso disponible. El
   formulario no deja elegir fechas ni horas ya pasadas, y limita la
   cantidad de horas de duración al máximo real disponible según la hora
-  elegida.
+  elegida. En "Mis Reservas" (filtrando por su propio nombre y apellido)
+  puede cancelar sus propias reservas.
 - **Administrador**: entra a la pestaña "Reportes" con el usuario/
   contraseña del paso 4. Ahí puede:
   - Ver el reporte de todas las reservas (quién, qué, cuándo), filtrable
-    por fecha.
+    por fecha y por docente (nombre o apellido, búsqueda parcial).
+  - Borrar cualquier reserva directamente desde la tabla del reporte.
   - Archivar manualmente las reservas vencidas.
   - En "Recursos y turnos": agregar/eliminar turnos, agregar/eliminar
     horas dentro de cada turno, agregar/eliminar recursos y elegir en
     qué turnos está disponible cada uno — todo sin tocar código ni
     redeployar.
 - **Lector** (opcional, ver paso 4): entra a la pestaña "Reportes" con su
-  propio usuario/contraseña. Puede ver y filtrar el reporte de reservas,
-  igual que el administrador, pero no ve la pestaña "Recursos y turnos"
-  ni el botón de archivar — solo consulta.
+  propio usuario/contraseña. Puede ver y filtrar el reporte de reservas
+  (por fecha y por docente), igual que el administrador, pero no ve la
+  pestaña "Recursos y turnos" ni los botones de archivar o borrar — solo
+  consulta.
 
 ## Licencia
 
