@@ -721,6 +721,9 @@ function aplicarPermisosAdmin() {
   const tabConfigBtn = document.getElementById("tab-config-btn");
   if (tabConfigBtn) tabConfigBtn.style.display = esAdmin ? "" : "none";
 
+  const tabRecurrentesBtn = document.getElementById("tab-recurrentes-btn");
+  if (tabRecurrentesBtn) tabRecurrentesBtn.style.display = esAdmin ? "" : "none";
+
   const btnArchivar = document.getElementById("btn-archivar");
   if (btnArchivar) btnArchivar.style.display = esAdmin ? "" : "none";
 
@@ -820,22 +823,28 @@ async function borrarReservaAdmin(id) {
 
 // Administración de turnos, horas y recursos (panel admin)
 function mostrarPanelAdmin(nombre) {
-  if (nombre === "config" && rolAdmin !== "admin") {
+  if ((nombre === "config" || nombre === "recurrentes") && rolAdmin !== "admin") {
     nombre = "reporte";
   }
 
   const panelReporte = document.getElementById("panel-reporte");
   const panelConfig = document.getElementById("panel-config");
+  const panelRecurrentes = document.getElementById("panel-recurrentes");
   if (panelReporte) panelReporte.style.display = nombre === "reporte" ? "block" : "none";
   if (panelConfig) panelConfig.style.display = nombre === "config" ? "block" : "none";
+  if (panelRecurrentes) panelRecurrentes.style.display = nombre === "recurrentes" ? "block" : "none";
 
   const tabs = document.querySelectorAll("#reporte-admin .tabs .tab");
   tabs.forEach(function (t) { t.classList.remove("active"); });
-  const idx = nombre === "reporte" ? 0 : 1;
+  const indexByName = { reporte: 0, config: 1, recurrentes: 2 };
+  const idx = indexByName[nombre];
   if (tabs[idx]) tabs[idx].classList.add("active");
 
   if (nombre === "config") {
     cargarAdminConfig();
+  }
+  if (nombre === "recurrentes") {
+    poblarFormularioRecurrente();
   }
 }
 
@@ -1100,6 +1109,197 @@ async function eliminarRecurso(id) {
     console.error("Error eliminando recurso:", error);
     mostrarEstado("Error eliminando el recurso. Intenta nuevamente.", "error");
   }
+}
+
+// Reservas recurrentes (panel admin): reservar el mismo recurso todas las
+// semanas, en uno o más días fijos, para un docente.
+const DIAS_SEMANA = [
+  { valor: 1, etiqueta: "Lunes" },
+  { valor: 2, etiqueta: "Martes" },
+  { valor: 3, etiqueta: "Miércoles" },
+  { valor: 4, etiqueta: "Jueves" },
+  { valor: 5, etiqueta: "Viernes" },
+  { valor: 6, etiqueta: "Sábado" },
+  { valor: 0, etiqueta: "Domingo" }
+];
+
+function poblarFormularioRecurrente() {
+  const turnoSelect = document.getElementById("recurrente-turno");
+  if (!turnoSelect) return;
+
+  const valorActual = turnoSelect.value;
+  turnoSelect.innerHTML = '<option value="">Seleccionar turno</option>';
+  turnosData.forEach(function (t) {
+    const option = document.createElement("option");
+    option.value = t.nombre;
+    option.textContent = t.etiqueta;
+    turnoSelect.appendChild(option);
+  });
+  if (valorActual) turnoSelect.value = valorActual;
+
+  onCambioTurnoRecurrente();
+}
+
+function onCambioTurnoRecurrente() {
+  const turno = document.getElementById("recurrente-turno").value;
+
+  const recursoSelect = document.getElementById("recurrente-recurso");
+  const valorRecursoActual = recursoSelect.value;
+  recursoSelect.innerHTML = '<option value="">Seleccionar recurso</option>';
+  getRecursosTurno(turno).forEach(function (nombreRecurso) {
+    const option = document.createElement("option");
+    option.value = nombreRecurso;
+    option.textContent = nombreRecurso;
+    recursoSelect.appendChild(option);
+  });
+  if (valorRecursoActual) recursoSelect.value = valorRecursoActual;
+
+  renderDiasRecurrente(turno);
+}
+
+function renderDiasRecurrente(turno) {
+  const container = document.getElementById("recurrente-dias-container");
+  if (!container) return;
+
+  const horas = getHorasTurno(turno);
+
+  if (!turno || horas.length === 0) {
+    container.innerHTML = '<div class="alert alert-warning">Elegir un turno para ver sus horas</div>';
+    return;
+  }
+
+  let html = "";
+  DIAS_SEMANA.forEach(function (dia) {
+    const opcionesHora = horas.map(function (h) { return '<option value="' + h + '">' + h + "</option>"; }).join("");
+    html +=
+      '<div class="form-group dia-recurrente" data-dia="' + dia.valor + '">' +
+      '<label><input type="checkbox" class="dia-recurrente-check" onchange="onToggleDiaRecurrente(this)" /> ' +
+      dia.etiqueta +
+      "</label>" +
+      '<span class="dia-recurrente-campos" style="display: none; margin-left: 10px">' +
+      "Hora inicio: " +
+      '<select class="dia-recurrente-hora">' +
+      opcionesHora +
+      "</select>" +
+      " &nbsp; Cantidad de horas: " +
+      '<input type="number" class="dia-recurrente-cantidad" min="1" max="' +
+      horas.length +
+      '" value="1" style="width: 60px" />' +
+      "</span>" +
+      "</div>";
+  });
+
+  container.innerHTML = html;
+}
+
+function onToggleDiaRecurrente(checkbox) {
+  const campos = checkbox.closest(".dia-recurrente").querySelector(".dia-recurrente-campos");
+  if (campos) campos.style.display = checkbox.checked ? "inline-block" : "none";
+}
+
+async function crearReservasRecurrentes() {
+  const nombre = document.getElementById("recurrente-nombre").value.trim();
+  const apellido = document.getElementById("recurrente-apellido").value.trim();
+  const turno = document.getElementById("recurrente-turno").value;
+  const recurso = document.getElementById("recurrente-recurso").value;
+  const fechaInicio = document.getElementById("recurrente-fecha-inicio").value;
+  const fechaFin = document.getElementById("recurrente-fecha-fin").value;
+
+  if (!nombre || !apellido || !turno || !recurso || !fechaInicio || !fechaFin) {
+    mostrarEstado("Completar todos los campos antes de crear las reservas recurrentes", "warning");
+    return;
+  }
+
+  if (fechaFin < fechaInicio) {
+    mostrarEstado("La fecha de fin no puede ser anterior a la de inicio", "warning");
+    return;
+  }
+
+  const reglas = [];
+  document.querySelectorAll(".dia-recurrente").forEach(function (fila) {
+    const check = fila.querySelector(".dia-recurrente-check");
+    if (!check || !check.checked) return;
+    const hora = fila.querySelector(".dia-recurrente-hora").value;
+    const cantidadHoras = parseInt(fila.querySelector(".dia-recurrente-cantidad").value, 10) || 1;
+    reglas.push({ diaSemana: parseInt(fila.getAttribute("data-dia"), 10), hora: hora, cantidadHoras: cantidadHoras });
+  });
+
+  if (reglas.length === 0) {
+    mostrarEstado("Elegir al menos un día de la semana", "warning");
+    return;
+  }
+
+  const resumenDias = reglas
+    .map(function (r) {
+      const etiquetaDia = DIAS_SEMANA.find(function (d) { return d.valor === r.diaSemana; }).etiqueta;
+      return etiquetaDia + " (" + r.hora + " x " + r.cantidadHoras + "h)";
+    })
+    .join(", ");
+
+  const confirmacion = confirm(
+    "¿Crear reservas recurrentes?\n\n" +
+    "Docente: " + nombre + " " + apellido + "\n" +
+    "Recurso: " + recurso + "\n" +
+    "Turno: " + turno + "\n" +
+    "Desde " + fechaInicio + " hasta " + fechaFin + "\n" +
+    "Días: " + resumenDias
+  );
+  if (!confirmacion) return;
+
+  const resultadoDiv = document.getElementById("recurrente-resultado");
+  if (resultadoDiv) resultadoDiv.innerHTML = "Creando reservas, puede tardar unos segundos...";
+
+  try {
+    const response = await fetch("/api/reservas-recurrentes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre: nombre,
+        apellido: apellido,
+        turno: turno,
+        recurso: recurso,
+        fechaInicio: fechaInicio,
+        fechaFin: fechaFin,
+        reglas: reglas
+      })
+    });
+    const result = await response.json();
+
+    if (!response.ok || result.status !== "ok") {
+      mostrarEstado(result.message || "Error creando las reservas recurrentes", "error");
+      if (resultadoDiv) resultadoDiv.innerHTML = "";
+      return;
+    }
+
+    renderResultadoRecurrente(result);
+  } catch (error) {
+    console.error("Error creando reservas recurrentes:", error);
+    mostrarEstado("Error creando las reservas recurrentes. Intenta nuevamente.", "error");
+    if (resultadoDiv) resultadoDiv.innerHTML = "";
+  }
+}
+
+function renderResultadoRecurrente(result) {
+  const container = document.getElementById("recurrente-resultado");
+  if (!container) return;
+
+  let html =
+    '<div class="alert alert-success">Se crearon ' +
+    result.creadas +
+    " de " +
+    result.total +
+    " reserva(s).</div>";
+
+  if (result.fallidas.length > 0) {
+    html +=
+      '<div class="alert alert-warning">No se pudieron crear ' + result.fallidas.length + " fecha(s):</div><ul>";
+    result.fallidas.forEach(function (f) {
+      html += "<li>" + formatearFecha(f.fecha) + ": " + f.message + "</li>";
+    });
+    html += "</ul>";
+  }
+
+  container.innerHTML = html;
 }
 
 function cambiarTab(tabName) {

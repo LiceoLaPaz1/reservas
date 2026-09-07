@@ -125,6 +125,7 @@
               <div class="tabs">
                 <div class="tab active" onclick="mostrarPanelAdmin('reporte')">📊 Reporte</div>
                 <div id="tab-config-btn" class="tab" onclick="mostrarPanelAdmin('config')">🗂️ Recursos y turnos</div>
+                <div id="tab-recurrentes-btn" class="tab" onclick="mostrarPanelAdmin('recurrentes')">🔁 Reservas recurrentes</div>
               </div>
               <button class="btn btn-danger" onclick="logoutAdmin()">Cerrar sesión</button>
 
@@ -166,6 +167,52 @@
                 </div>
                 <div id="nuevo-recurso-turnos" class="form-group"></div>
                 <button class="btn" onclick="agregarRecurso()">Agregar recurso</button>
+              </div>
+
+              <div id="panel-recurrentes" style="display: none">
+                <h3>🔁 Crear reservas recurrentes</h3>
+                <p>
+                  Reserva el mismo recurso todas las semanas, en uno o más
+                  días fijos, para un docente — por ejemplo, un curso que
+                  usa la misma sala todos los lunes y jueves durante el
+                  semestre.
+                </p>
+
+                <div class="form-group">
+                  <label for="recurrente-nombre">Nombre del docente:</label>
+                  <input type="text" id="recurrente-nombre" placeholder="Ej: Ana" />
+                </div>
+                <div class="form-group">
+                  <label for="recurrente-apellido">Apellido del docente:</label>
+                  <input type="text" id="recurrente-apellido" placeholder="Ej: Gómez" />
+                </div>
+                <div class="form-group">
+                  <label for="recurrente-turno">Turno:</label>
+                  <select id="recurrente-turno" onchange="onCambioTurnoRecurrente()">
+                    <option value="">Seleccionar turno</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="recurrente-recurso">Recurso:</label>
+                  <select id="recurrente-recurso">
+                    <option value="">Seleccionar recurso</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="recurrente-fecha-inicio">Desde:</label>
+                  <input type="date" id="recurrente-fecha-inicio" />
+                </div>
+                <div class="form-group">
+                  <label for="recurrente-fecha-fin">Hasta:</label>
+                  <input type="date" id="recurrente-fecha-fin" />
+                </div>
+
+                <h4>Días de la semana</h4>
+                <div id="recurrente-dias-container"></div>
+
+                <button class="btn" onclick="crearReservasRecurrentes()">Crear reservas recurrentes</button>
+
+                <div id="recurrente-resultado" style="margin-top: 20px"></div>
               </div>
             </div>
           </div>
