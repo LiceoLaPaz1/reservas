@@ -1,5 +1,5 @@
 const bcrypt = require("bcryptjs");
-const { crearTokenSesion, cookieSesion } = require("./_auth");
+const { crearTokenSesion, cookieSesion, cookieLogout } = require("./_auth");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -8,7 +8,15 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { usuario, contrasena } = req.body || {};
+    const { usuario, contrasena, accion } = req.body || {};
+
+    // /api/logout esta fusionado aca (mismo archivo) para no pasarnos del
+    // limite de funciones serverless del plan de Vercel.
+    if (accion === "logout") {
+      res.setHeader("Set-Cookie", cookieLogout());
+      res.status(200).json({ status: "ok" });
+      return;
+    }
 
     if (!usuario || !contrasena) {
       res.status(400).json({ status: "error", message: "Faltan usuario o contraseña" });

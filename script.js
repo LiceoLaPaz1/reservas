@@ -670,7 +670,11 @@ async function loginAdmin() {
 
 async function logoutAdmin() {
   try {
-    await fetch("/api/logout", { method: "POST" });
+    await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accion: "logout" })
+    });
   } catch (error) {
     console.error("Error cerrando sesión:", error);
   }
