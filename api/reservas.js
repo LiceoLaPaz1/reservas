@@ -36,28 +36,58 @@ module.exports = async function handler(req, res) {
         return;
       }
 
+      // Etiquetas de hora del turno, en orden, para poder expandir la
+      // cantidad de horas pedida a la lista real de horas que cubre
+      // (ej. inicio "1era" + 3 horas -> ["1era", "2da", "3era"]).
+      const filasHorasTurno = await sql`
+        SELECT h.etiqueta, to_char(h.hora_inicio, 'HH24:MI') AS "horaInicio"
+        FROM horas h
+        JOIN turnos t ON t.id = h.turno_id
+        WHERE t.nombre = ${turno}
+        ORDER BY h.orden
+      `;
+      const etiquetasTurno = filasHorasTurno.map(function (h) { return h.etiqueta; });
+      const indiceHora = etiquetasTurno.indexOf(hora);
+
+      if (indiceHora === -1) {
+        res.status(400).json({ status: "error", message: "Hora inválida para ese turno" });
+        return;
+      }
+
+      const cantidad = cantidadHoras || 1;
+      if (indiceHora + cantidad > etiquetasTurno.length) {
+        res.status(400).json({ status: "error", message: "No hay suficientes horas disponibles en ese turno" });
+        return;
+      }
+
+      const horasCubiertas = etiquetasTurno.slice(indiceHora, indiceHora + cantidad);
+
       if (fecha === hoy) {
-        const filasHora = await sql`
-          SELECT to_char(h.hora_inicio, 'HH24:MI') AS "horaInicio"
-          FROM horas h
-          JOIN turnos t ON t.id = h.turno_id
-          WHERE t.nombre = ${turno} AND h.etiqueta = ${hora}
-        `;
-        const horaInicio = filasHora[0] && filasHora[0].horaInicio;
+        const horaInicio = filasHorasTurno[indiceHora].horaInicio;
         if (horaInicio && horaInicio <= horaActual()) {
           res.status(400).json({ status: "error", message: "Esa hora ya pasó" });
           return;
         }
       }
 
-      const rows = await sql`
-        INSERT INTO reservas (nombre, apellido, fecha, turno, hora, recurso, cantidad_horas)
-        VALUES (${nombre}, ${apellido}, ${fecha}, ${turno}, ${hora}, ${recurso}, ${cantidadHoras || 1})
-        RETURNING id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
-                  cantidad_horas AS "cantidadHoras",
-                  fecha_reserva AS "fechaReserva"
-      `;
-      res.status(201).json({ status: "success", reserva: rows[0] });
+      // Se inserta una fila por cada hora cubierta (no solo la de inicio),
+      // todas en una misma transacción: así el recurso queda protegido en
+      // todo el rango reservado, no solo en la primera hora, y si alguna
+      // hora del rango choca con otra reserva, no queda guardada ninguna.
+      const inserts = horasCubiertas.map(function (h) {
+        return sql`
+          INSERT INTO reservas (nombre, apellido, fecha, turno, hora, recurso, cantidad_horas)
+          VALUES (${nombre}, ${apellido}, ${fecha}, ${turno}, ${h}, ${recurso}, ${cantidad})
+          RETURNING id, nombre, apellido, to_char(fecha, 'YYYY-MM-DD') AS fecha, turno, hora, recurso,
+                    cantidad_horas AS "cantidadHoras",
+                    fecha_reserva AS "fechaReserva"
+        `;
+      });
+
+      const resultados = await sql.transaction(inserts);
+      const filasCreadas = resultados.map(function (filas) { return filas[0]; });
+
+      res.status(201).json({ status: "success", reserva: filasCreadas[0], reservas: filasCreadas });
     } catch (error) {
       if (error && error.code === "23505") {
         const esConflictoDocente = error.constraint && error.constraint.indexOf("docente") !== -1;
@@ -65,7 +95,7 @@ module.exports = async function handler(req, res) {
           status: "conflict",
           message: esConflictoDocente
             ? "Ya tenés otra reserva en ese mismo horario"
-            : "Ese recurso ya está reservado en ese horario"
+            : "Ese recurso ya está reservado en alguna de las horas seleccionadas"
         });
         return;
       }

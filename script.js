@@ -348,42 +348,20 @@ async function realizarReserva(fecha, turno, hora, recurso) {
 
     if (!confirmacion) return;
 
-    // Realizar reservas
-    let reservasExitosas = 0;
-    let mensajeFallo = null;
-    const nuevasReservas = [];
+    // Realizar la reserva: una sola llamada al servidor, que guarda todas
+    // las horas del rango de forma atómica (todo o nada), así el recurso
+    // queda protegido en cada hora y no solo en la de inicio.
+    const resultado = await enviarReservaServidor({
+      fecha: fecha,
+      turno: turno,
+      hora: hora,
+      recurso: recurso,
+      nombre: nombre,
+      apellido: apellido,
+      cantidadHoras: duracion
+    });
 
-    for (let i = 0; i < horasSeleccionadas.length; i++) {
-      const h = horasSeleccionadas[i];
-
-      const nuevaReserva = {
-        id: Date.now() + i + Math.floor(Math.random() * 1000),
-        fecha: fecha,
-        turno: turno,
-        hora: h,
-        recurso: recurso,
-        nombre: nombre,
-        apellido: apellido,
-        cantidadHoras: duracion,
-        fechaReserva: new Date().toISOString()
-      };
-
-      const resultado = await enviarReservaServidor(nuevaReserva);
-      if (resultado.exito) {
-        nuevasReservas.push(nuevaReserva);
-        reservasExitosas++;
-      } else {
-        console.warn("Fallo reserva para hora " + h + ", cancelando proceso");
-        mensajeFallo = resultado.mensaje;
-        break;
-      }
-    }
-
-    if (reservasExitosas === horasSeleccionadas.length) {
-      // Todas exitosas
-      reservas = reservas.concat(nuevasReservas);
-      localStorage.setItem("reservasLiceo", JSON.stringify(reservas));
-
+    if (resultado.exito) {
       mostrarEstado(
         "Reserva realizada exitosamente!\n" +
         recurso + " - " + fecha + " - " + turno + "\n" +
@@ -392,8 +370,7 @@ async function realizarReserva(fecha, turno, hora, recurso) {
       );
     } else {
       mostrarEstado(
-        (mensajeFallo || "Algunas horas ya estaban ocupadas.") +
-        "\nSolo se pudieron reservar " + reservasExitosas + " de " + horasSeleccionadas.length + " horas.",
+        resultado.mensaje || "Este recurso ya está reservado en alguna de las horas seleccionadas.",
         "warning"
       );
     }
