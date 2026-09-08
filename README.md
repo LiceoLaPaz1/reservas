@@ -2,7 +2,6 @@
 
 🔗 En vivo (Liceo La Paz 1): https://reservas-sand.vercel.app/
 📁 La planilla con las reservas archivadas está en el Drive de POITES.
-📖 Ver guía aquí: https://recursos-docentes.github.io/plantilla-escritos-digitales/guia-escritos-digitales.html#arquitectura
 
 Aplicación web para reservar recursos compartidos de una institución (cañón,
 TVs, salas, etc.) por fecha, turno y hora, con panel de administrador para
